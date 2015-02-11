@@ -48,12 +48,12 @@ void resrc_id_list_destroy (resource_list_t * resrc_ids);
 /*
  * Get the first element in the result list
  */
-char* resrc_list_first(resource_list_t * rl);
+// char* resrc_list_first(resource_list_t * rl);
 
 /*
  * Get the next element in the resource id list
  */
-char* resrc_list_next();
+// char* resrc_list_next();
 
 /*
  * Get the next element in the resource id list
