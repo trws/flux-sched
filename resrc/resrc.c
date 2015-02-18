@@ -66,14 +66,14 @@ struct resrc {
  *  API
  ***************************************************************************/
 
-char *resrc_type (resrc_t *resrc)
+const char *resrc_type (resrc_t *resrc)
 {
     if (resrc)
         return resrc->type;
     return NULL;
 }
 
-char *resrc_name (resrc_t *resrc)
+const char *resrc_name (resrc_t *resrc)
 {
     if (resrc)
         return resrc->name;
@@ -112,12 +112,12 @@ void resrc_id_list_destroy (resource_list_t *resrc_ids_in)
     }
 }
 
-char *resrc_list_first (resource_list_t *rl)
+const unsigned char *resrc_list_first (resource_list_t *rl)
 {
     return zlist_first ((zlist_t*)rl);
 }
 
-char *resrc_list_next (resource_list_t *rl)
+const unsigned char *resrc_list_next (resource_list_t *rl)
 {
     return zlist_next ((zlist_t*)rl);
 }

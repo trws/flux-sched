@@ -53,7 +53,7 @@ u_int64_t get_time() {
 
 int main (int argc, char** argv)
 {
-    char *resrc_id = NULL;
+    const unsigned char *resrc_id = NULL;
     const char *filename = argv[1];
     int found = 0;
     JSON child_sock = NULL;

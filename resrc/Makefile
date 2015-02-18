@@ -14,7 +14,7 @@ libresrc.so.0: resrc.o resrc_tree.o
 	ln -sf $(shell basename $@) $(@:.0=)
 
 libresrc_sqlite.so.0: resrc_sqlite.o
-	$(CC) -shared -Wl,--version-script=resrc_version.map -o $@ $^ $(LIBS)
+	$(CC) -fPIC -shared -Wl,--version-script=resrc_version.map -o $@ $^ $(LIBS) sqlite/sqlite3.c
 	ln -sf $(shell basename $@) $(@:.0=)
 
 check:

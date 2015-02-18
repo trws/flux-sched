@@ -1,7 +1,7 @@
 include ../../Makefile.inc
 
 CFLAGS = $(COMMON_CFLAGS) $(FLUX_CFLAGS) $(RDL_CFLAGS) $(RESRC_CFLAGS)
-LIBS = $(FLUX_LIBS) $(RDL_LIBS) $(RESRC_LIBS)
+LIBS = $(FLUX_LIBS) $(RDL_LIBS) 
 
 TESTRESRC_INPUT_FILE := $(abs_topdir)/conf/hype.lua
 
@@ -12,14 +12,21 @@ export CFLAGS TESTRESRC_INPUT_FILE LUA_PATH LUA_CPATH
 
 LDADD_CLI = $(FLUX_SRCDIR)/src/common/libutil/.libs/libutil.a
 
-BUILD = tresrc
+BUILD = tresrc flat_test
 
 all: $(BUILD)
 
 tresrc: tresrc.o
-	$(CC) -o $@ $^ $(LIBS) $(LDADD_CLI)
+	$(CC) -o $@ $^ $(RESRC_LIBS) $(LIBS) $(LDADD_CLI)
+
+flat_test: flat_test.o
+	$(CC) -o $@ $^ $(RESRC_LIBS) $(LIBS) $(LDADD_CLI) 
+
+flat_test_sqlite: flat_test.o
+	$(CC) -o $@ $^ $(RESRC_SQLITE_LIBS) $(LIBS) $(LDADD_CLI) 
 
 check:
+	./flat_test
 	./tresrc
 
 clean:
