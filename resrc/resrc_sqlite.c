@@ -840,7 +840,7 @@ char *build_query_string (const char *fields,
     free (from);
     free (where);
     free (group);
-    /* printf ("New multilevel query string: %s\n", ret); */
+    printf ("New multilevel query string: %s\n", ret);
     return ret;
 }
 
@@ -851,7 +851,7 @@ int resrc_tree_search_multilevel_count (const resource_list_t *ids,
     sqlite3 *db = ids->db;
 
     // Build a counting string
-    char *sql = build_query_string ("count(*)", req_res, false);
+    char *sql = build_query_string ("count(DISTINCT r_l0.id)", req_res, false);
     sqlite3_stmt *stmt = NULL;
     SQLITE_CHECK (db, sqlite3_prepare_v2 (db, sql, strlen (sql), &stmt, NULL));
     if (sqlite3_step (stmt) != SQLITE_ROW)
