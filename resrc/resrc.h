@@ -27,17 +27,22 @@ typedef enum {
 /*
  * Return the type of the resouce
  */
-const char *resrc_type (resrc_t *resrc);
+const char *resrc_type (const resrc_t *resrc);
 
 /*
  * Return the name of the resouce
  */
-const char *resrc_name (resrc_t *resrc);
+const char *resrc_name (const resrc_t *resrc);
+
+/*
+ * Return the name of the resouce
+ */
+int64_t resrc_id (const resrc_t *resrc);
 
 /*
  * Return the physical tree for the resouce
  */
-resrc_tree_t *resrc_phys_tree (resrc_t *resrc);
+const resrc_tree_t *resrc_phys_tree (const resrc_t *resrc);
 
 /*
  * Free memory allocated to a job id
@@ -57,12 +62,12 @@ void resrc_id_list_destroy (resource_list_t *resrc_ids);
 /*
  * Get the first element in the result list
  */
-const unsigned char *resrc_list_first (resource_list_t *rl);
+const resrc_t *resrc_list_first (resource_list_t *rl);
 
 /*
  * Get the next element in the resource id list
  */
-const unsigned char *resrc_list_next ();
+const resrc_t *resrc_list_next ();
 
 /*
  * Get the next element in the resource id list
@@ -83,7 +88,7 @@ resrc_t *resrc_copy_resource (resrc_t *resrc);
 /*
  * Destroy a resource object
  */
-void resrc_resource_destroy (void *object);
+void resrc_resource_destroy (resrc_t *object);
 
 /*
  * Create a hash table of all resources described by a configuration

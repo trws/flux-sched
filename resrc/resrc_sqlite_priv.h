@@ -1,6 +1,8 @@
 #ifndef __RESRC_SQLITE_PRIV_H
 #define __RESRC_SQLITE_PRIV_H
 
+#include <czmq.h>
+
 #include "resrc.h"
 
 #define SQLITE_CHECK_EXPECT(db, f, x)\
@@ -27,6 +29,7 @@ struct resource_list{
     struct sqlite3 * db;
     struct sqlite3_stmt * stmt;
     const char * query;
+    resrc_t * cursor;
 };
 
 typedef struct {
@@ -35,13 +38,16 @@ typedef struct {
 } resrc_pool_t;
 
 struct resrc{
+  //always populated
     int64_t id;
+    struct resources resource_database;
+    bool initialized;
     int64_t local_id;
     const char *type;
     const char *name;
     bool pool;
     int64_t pool_size;
-    int64_t parent;
+    zlist_t * ancestors;
     int64_t max_jobs;
     uuid_t uuid;
     resource_state_t state;

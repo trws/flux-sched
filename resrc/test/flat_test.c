@@ -7,6 +7,7 @@
 #include <czmq.h>
 
 #include "../resrc.h"
+#include "../resrc_tree.h"
 #include "src/common/libutil/jsonutil.h"
 #include "src/common/libutil/xzmalloc.h"
 
@@ -43,19 +44,31 @@ int main (int argc, char** argv)
     printf ("starting\n");
     /* resrc_print_resources (resrcs); */
     init_time();
+    JSON child_sock = Jnew();
+    JSON child_core = Jnew();
     JSON req_res = Jnew ();
+    Jadd_str (child_core, "type", "core");
+    Jadd_int (child_core, "req_qty", 6);
+
+    Jadd_str (child_sock, "type", "socket");
+    Jadd_int (child_sock, "req_qty", 4);
+    json_object_object_add (child_sock, "req_child", child_core);
+
     Jadd_str (req_res, "type", "node");
     Jadd_int (req_res, "req_qty", 2);
+    json_object_object_add (req_res, "req_child", child_sock);
 
     found = resrc_search_flat_resources (resrcs, found_res, req_res, false);
-    Jput(req_res);
+    found = resrc_tree_search (found_res, found_res,
+                               req_res, false);
 
+    Jput(req_res);
     printf ("found %d nodes\n", found);
     if (found) {
-        const unsigned char * resrc_id = resrc_list_first (found_res);
-        while (resrc_id) {
-            printf ("resrc_id %s\n", resrc_id);
-            resrc_id = resrc_list_next (found_res);
+        const resrc_t * resrc = resrc_list_first (found_res);
+        while (resrc) {
+            printf ("resrc_id %ld\n", resrc_id(resrc));
+            resrc = resrc_list_next (found_res);
         }
     }
     printf("find and scan took: %lf\n", ((double)get_time())/1000000);
@@ -67,7 +80,7 @@ int main (int argc, char** argv)
     resrc_reserve_resources (resrcs, found_res, 4);
     printf ("allocated\n");
     printf("allocate and reserve took: %lf\n", ((double)get_time())/1000000);
-    resrc_print_resources (resrcs);
+    /* resrc_print_resources (resrcs); */
     init_time();
     resrc_release_resources (resrcs, found_res, 1);
     printf ("released\n");

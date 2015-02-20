@@ -40,43 +40,48 @@
 
 static struct timeval start_time;
 
-void init_time() {
-              gettimeofday(&start_time, NULL);
-}
-
-u_int64_t get_time() {
-    struct timeval t;
-    gettimeofday(&t, NULL);
-    return (u_int64_t) (t.tv_sec - start_time.tv_sec) * 1000000
-        + (t.tv_usec - start_time.tv_usec);
-}
-
-int main (int argc, char** argv)
+void init_time ()
 {
-    const unsigned char *resrc_id = NULL;
+    gettimeofday (&start_time, NULL);
+}
+
+u_int64_t get_time ()
+{
+    struct timeval t;
+    gettimeofday (&t, NULL);
+    return (u_int64_t)(t.tv_sec - start_time.tv_sec) * 1000000
+           + (t.tv_usec - start_time.tv_usec);
+}
+
+int main (int argc, char **argv)
+{
     const char *filename = argv[1];
     int found = 0;
     JSON child_sock = NULL;
     JSON child_core = NULL;
     JSON o = NULL;
     JSON req_res = NULL;
-    resrc_t *resrc = NULL;
-    resrc_tree_t *resrc_tree = NULL;
+    const resrc_t *resrc = NULL;
+    const resrc_tree_t *resrc_tree = NULL;
     resources_t *resrcs;
     resource_list_t *found_res = resrc_new_id_list ();
 
     if (filename == NULL || *filename == '\0')
         filename = getenv ("TESTRESRC_INPUT_FILE");
 
-    init_time();
+    init_time ();
     resrcs = resrc_generate_resources (filename, "default");
-    printf("resource generation took: %lf\n", ((double)get_time())/1000000);
+    printf ("resource generation took: %lf\n", ((double)get_time ()) / 1000000);
     printf ("starting\n");
     resrc_print_resources (resrcs);
     printf ("end of resources\n");
 
     printf ("printing resource tree\n");
-    resrc = zhash_lookup ((zhash_t *)resrcs, "cluster.0");
+    JSON cluster_request = Jnew ();
+    Jadd_str (cluster_request, "type", "cluster");
+    Jadd_int (cluster_request, "req_qty", 1);
+    resrc_search_flat_resources (resrcs, found_res, cluster_request, false);
+    resrc = resrc_list_first (found_res);
     if (resrc)
         resrc_tree_print (resrc_phys_tree (resrc));
     else
@@ -98,46 +103,49 @@ int main (int argc, char** argv)
     json_object_object_add (req_res, "req_child", child_sock);
 
     resrc_tree = resrc_phys_tree (resrc);
-    init_time();
-    found = resrc_tree_search (resrc_tree_children (resrc_tree), found_res,
-                               req_res, false);
+    init_time ();
+    found = resrc_tree_search (resrc_tree_children (resrc_tree),
+                               found_res,
+                               req_res,
+                               false);
     if (found) {
-        printf ("Found %d composite resources in %lf\n", found,
-                ((double)get_time())/1000000);
-        resrc_id = resrc_list_first (found_res);
-        while (resrc_id) {
-            printf ("resrc_id %s\n", resrc_id);
-            resrc_id = resrc_list_next (found_res);
+        printf ("Found %d composite resources in %lf\n",
+                found,
+                ((double)get_time ()) / 1000000);
+        resrc = resrc_list_first (found_res);
+        while (resrc) {
+            printf ("resrc_id %ld\n", resrc_id(resrc));
+            resrc = resrc_list_next (found_res);
         }
     }
     Jput (req_res);
 
-    init_time();
+    init_time ();
     o = resrc_serialize (resrcs, found_res);
     printf ("Found resource serialization took: %lf\n",
-            ((double)get_time())/1000000);
+            ((double)get_time ()) / 1000000);
     printf ("The found resources serialized: %s\n", Jtostr (o));
     Jput (o);
 
-    init_time();
+    init_time ();
     resrc_allocate_resources (resrcs, found_res, 1);
     resrc_allocate_resources (resrcs, found_res, 2);
     resrc_allocate_resources (resrcs, found_res, 3);
     resrc_reserve_resources (resrcs, found_res, 4);
     printf ("allocated\n");
-    printf("allocate and reserve took: %lf\n", ((double)get_time())/1000000);
+    printf ("allocate and reserve took: %lf\n",
+            ((double)get_time ()) / 1000000);
     /* resrc_print_resources (resrcs); */
-    init_time();
+    init_time ();
     resrc_release_resources (resrcs, found_res, 1);
     printf ("released\n");
-    printf("release took: %lf\n", ((double)get_time())/1000000);
-    init_time();
+    printf ("release took: %lf\n", ((double)get_time ()) / 1000000);
+    init_time ();
     resrc_id_list_destroy (found_res);
     /* resrc_print_resources (resrcs); */
 
     resrc_destroy_resources (&resrcs);
-    printf("destroy took: %lf\n", ((double)get_time())/1000000);
+    printf ("destroy took: %lf\n", ((double)get_time ()) / 1000000);
 
     return 0;
 }
-

@@ -26,7 +26,6 @@
 
 #include <stdarg.h>
 // for asprintf
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -47,7 +46,7 @@
  *  API
  ***************************************************************************/
 
-const char *resrc_type (resrc_t *resrc)
+const char *resrc_type (const resrc_t *resrc)
 {
     return resrc->type;
 }
@@ -77,15 +76,33 @@ void resrc_id_list_destroy (resource_list_t *resrc_ids_in)
     free (resrc_ids_in);
 }
 
-const unsigned char *resrc_list_next (resource_list_t *rl)
+const resrc_t *resrc_list_next (resource_list_t *rl)
 {
-    return sqlite3_step (rl->stmt) == SQLITE_ROW
-               ? sqlite3_column_text (rl->stmt, 0)
-               : NULL;
+    if (!rl)
+        return NULL;
+
+    if (rl->cursor == NULL)
+        rl->cursor = resrc_new_resource (NULL, NULL, 0, NULL);
+
+    // If this is null, it's programmer error
+    assert (rl->stmt != NULL);
+
+    if (sqlite3_step (rl->stmt) == SQLITE_ROW) {
+        rl->cursor->initialized = false;
+        rl->cursor->id = sqlite3_column_int64 (rl->stmt, 0);
+        rl->cursor->resource_database.db = rl->db;
+    } else {
+        // No row is available
+        return NULL;
+    }
+    return rl->cursor;
 }
 
-const unsigned char *resrc_list_first (resource_list_t *rl)
+const resrc_t *resrc_list_first (resource_list_t *rl)
 {
+    if (!rl)
+        return NULL;
+
     if (!rl->stmt)
         SQLITE_CHECK (rl->db,
                       sqlite3_prepare_v2 (rl->db,
@@ -137,6 +154,19 @@ void create_base_schema (sqlite3 *db)
         //here actually adds jobs...
         ");"
         "CREATE INDEX job_link_id_index ON job_link(job_id);"
+
+        "DROP TABLE IF EXISTS ancestors;"
+        "CREATE TABLE ancestors("
+        "ancestor INTEGER NOT NULL,"
+        "resource_id INTEGER NOT NULL,"
+        "depth INTEGER,"
+        "FOREIGN KEY(resource_id) REFERENCES resources(id),"
+        "FOREIGN KEY(ancestor) REFERENCES resources(id),"
+        "PRIMARY KEY(ancestor, resource_id)"
+        //here actually adds jobs...
+        ");"
+        "CREATE INDEX ancestors_ancestor ON ancestors(ancestor);"
+        "CREATE INDEX ancestors_id ON ancestors(resource_id);"
         ;
 
     SQLITE_CHECK (db, sqlite3_exec (db, schema, 0, 0, NULL));
@@ -159,6 +189,31 @@ int64_t add_resource_type (sqlite3 *db, const char *name, bool pool)
     SQLITE_CHECK_EXPECT (db, sqlite3_step (stmt), SQLITE_DONE);
     SQLITE_CHECK (db, sqlite3_finalize (stmt));
     return sqlite3_last_insert_rowid (db);
+}
+
+void add_ancestors (sqlite3 *db, int64_t resource_id, zlist_t *ancestors)
+{
+    const char * sql = 
+        "INSERT INTO ancestors "
+        "      (resource_id, ancestor, depth) "
+        "VALUES(          ?,        ?, ?)";
+    static sqlite3_stmt *stmt = NULL;
+    if (!stmt)
+        SQLITE_CHECK (
+            db, sqlite3_prepare_v2 (db, sql, strlen (sql) + 1, &stmt, NULL));
+
+    int64_t *ancestor = zlist_first (ancestors);
+    int64_t depth = 0;
+    while (ancestor) {
+        SQLITE_CHECK (db, sqlite3_bind_int64 (stmt, 1, resource_id));
+        SQLITE_CHECK (db, sqlite3_bind_int64 (stmt, 2, *ancestor));
+        SQLITE_CHECK (db, sqlite3_bind_int64 (stmt, 3, depth));
+
+        SQLITE_CHECK_EXPECT (db, sqlite3_step (stmt), SQLITE_DONE);
+        SQLITE_CHECK (db, sqlite3_reset (stmt));
+        ancestor = zlist_next (ancestors);
+        depth++;
+    }
 }
 
 int64_t add_resource (sqlite3 *db, resrc_t *r)
@@ -206,8 +261,9 @@ int64_t add_resource (sqlite3 *db, resrc_t *r)
     SQLITE_CHECK (db, sqlite3_bind_int (stmt, ++id, r->pool));
     SQLITE_CHECK (db, sqlite3_bind_int64 (stmt, ++id, r->pool_size));
 
-    if (r->parent > 0) {
-        SQLITE_CHECK (db, sqlite3_bind_int64 (stmt, ++id, r->parent));
+    if (zlist_size (r->ancestors) > 0) {
+        int64_t *parent = zlist_first (r->ancestors);
+        SQLITE_CHECK (db, sqlite3_bind_int64 (stmt, ++id, *parent));
     } else {
         SQLITE_CHECK (db, sqlite3_bind_null (stmt, ++id));
     }
@@ -239,7 +295,11 @@ int64_t add_resource (sqlite3 *db, resrc_t *r)
     }
 
     sqlite3_reset (stmt);
-    return sqlite3_last_insert_rowid (db);
+
+    int64_t new_resource_id = sqlite3_last_insert_rowid (db);
+    add_ancestors (db, new_resource_id, r->ancestors);
+
+    return new_resource_id;
 }
 
 resrc_t *resrc_new_resource (const char *type,
@@ -247,20 +307,37 @@ resrc_t *resrc_new_resource (const char *type,
                              int64_t id,
                              uuid_t uuid)
 {
-    return NULL;
+    resrc_t *ret = xzmalloc (sizeof(resrc_t));
+    if (ret && type && name && !uuid_is_null (uuid)) {
+        *ret = (resrc_t){.type = type,
+                         .name = name,
+                         .id = id,
+                         .initialized = true};
+        uuid_copy (ret->uuid, uuid);
+    } else if (ret) {
+        *ret = (resrc_t){.id = id, .initialized = false};
+    }
+    return ret;
 }
 
 resrc_t *resrc_copy_resource (resrc_t *resrc)
 {
+    // TODO: nothing uses this yet
     return NULL;
 }
 
-void resrc_resource_destroy (void *object)
+void resrc_resource_destroy (resrc_t *object)
 {
+    if (object) {
+        if (object->initialized) {
+            zlist_destroy (&object->ancestors);
+        }
+    }
+    free (object);
 }
 
 static int64_t resrc_add_resource (resources_t *resource_database,
-                                   int64_t parent,
+                                   zlist_t *ancestors,
                                    struct resource *rdl_resource)
 {
     const char *name = NULL;
@@ -280,7 +357,7 @@ static int64_t resrc_add_resource (resources_t *resource_database,
     resrc_t new_resource = {.type = type,
                             .name = name,
                             .local_id = local_id,
-                            .parent = parent,
+                            .ancestors = ancestors,
                             .state = RESOURCE_IDLE};
 
     uuid_parse (tmp, new_resource.uuid);
@@ -290,20 +367,31 @@ static int64_t resrc_add_resource (resources_t *resource_database,
     return database_id;
 }
 
-static void resrc_add_resource_from_rdl_tree (resources_t *resource_database,
-                                              int64_t parent,
-                                              struct resource *r)
+static void resrc_add_resource_from_rdl_tree_inner (
+    resources_t *resource_database,
+    struct resource *r,
+    zlist_t *ancestors)
 {
     struct resource *c;
-    int64_t parent_id_for_children
-        = resrc_add_resource (resource_database, parent, r);
+    int64_t *current_id = malloc (sizeof(int64_t));
+    *current_id = resrc_add_resource (resource_database, ancestors, r);
 
+    zlist_append (ancestors, current_id);
     while ((c = rdl_resource_next_child (r))) {
-        resrc_add_resource_from_rdl_tree (resource_database,
-                                          parent_id_for_children,
-                                          c);
+        resrc_add_resource_from_rdl_tree_inner (resource_database,
+                                                c,
+                                                ancestors);
         rdl_resource_destroy (c);
     }
+    zlist_remove (ancestors, current_id);
+    free (current_id);
+}
+static void resrc_add_resource_from_rdl_tree (resources_t *resource_database,
+                                              struct resource *r)
+{
+    zlist_t *ancestors = zlist_new ();
+    resrc_add_resource_from_rdl_tree_inner (resource_database, r, ancestors);
+    zlist_destroy (&ancestors);
 }
 
 resources_t *resrc_generate_resources (const char *path, char *resource)
@@ -334,7 +422,7 @@ resources_t *resrc_generate_resources (const char *path, char *resource)
     }
     create_base_schema (resource_database->db);
 
-    resrc_add_resource_from_rdl_tree (resource_database, 0, r);
+    resrc_add_resource_from_rdl_tree (resource_database, r);
     rdl_destroy (rdl);
     rdllib_close (l);
 ret:
@@ -429,7 +517,6 @@ void resrc_print_resources (resources_t *resource_database)
         "FROM resources "
         "ORDER BY id ASC ";
 
-    // TODO: add job printing as a shim around the callback
     SQLITE_CHECK (resource_database->db,
                   sqlite3_exec (resource_database->db,
                                 sql,
@@ -463,6 +550,26 @@ int resrc_search_flat_resources_for_count (sqlite3 *db,
     int ret = sqlite3_column_int64 (stmt, 0);
     SQLITE_CHECK (db, sqlite3_finalize (stmt));
     return ret;
+}
+
+void resrc_search_by_id (const resources_t *resource_database,
+                         resource_list_t *found,
+                         int64_t id)
+{
+    if (!resource_database || !found) {
+        return;
+    }
+
+    const char * sql = 
+        "SELECT id "
+        "FROM resources "
+        "WHERE parent = %ld ";
+    // the extra OR construct allows me to only prepare this statement once,
+    // even if state shouldn't be considered
+
+    found->query = sqlite3_mprintf (sql, id);
+    found->db = resource_database->db;
+    found->stmt = NULL;
 }
 
 int resrc_search_flat_resources (resources_t *resource_database,
@@ -531,7 +638,7 @@ int resrc_allocate_resources (resources_t *resource_database,
     const char * const sql = "INSERT INTO job_link (job_id, resource_id) SELECT (%lld) as job_id, id as resource_id from (%s)";
     const char *const inserter
         = sqlite3_mprintf (sql, job_id, resrc_ids->query);
-    printf ("running inserter: %s\n", inserter);
+    /* printf ("running inserter: %s\n", inserter); */
     SQLITE_CHECK (resource_database->db,
                   sqlite3_exec (resource_database->db, inserter, 0, 0, NULL));
 
@@ -572,33 +679,34 @@ ret:
     return rc;
 }
 
-/* json_object *resrc_serialize (resources_t *resource_database_in,
- * resource_list_t * resrc_ids_in) */
-/* { */
-/*     zhash_t * resource_database = (zhash_t *)resource_database_in; */
-/*     zlist_t * resrc_ids = (zlist_t*)resrc_ids_in; */
-/*     char *resrc_id; */
-/*     json_object *ja; */
-/*     json_object *o = NULL; */
-/*     resrc_t *resrc; */
-/*  */
-/*     if (!resource_database || !resrc_ids) { */
-/*         goto ret; */
-/*     } */
-/*  */
-/*     o = util_json_object_new_object (); */
-/*     ja = json_object_new_array (); */
-/*     resrc_id = zlist_first (resrc_ids); */
-/*     while (resrc_id) { */
-/*         resrc = zhash_lookup (resource_database, resrc_id); */
-/*         json_object_array_add (ja, json_object_new_string (resrc->name)); */
-/*         resrc_id = zlist_next (resrc_ids); */
-/*     } */
-/*     json_object_object_add (o, "resource_database", ja); */
-/* ret: */
-/*     return o; */
-/* } */
-/*  */
+json_object *resrc_serialize (resources_t *resource_database,
+                              resource_list_t *resrc_ids)
+{
+    JSON o = NULL;
+    if (!resource_database || !resrc_ids) {
+        goto ret;
+    }
+
+    char *sql = sqlite3_mprintf (
+        "SELECT resources.id as id, name FROM resources JOIN (%s) as query on "
+        "resources.id = query.id",
+        resrc_ids->query);
+
+    sqlite3_stmt *stmt;
+    SQLITE_CHECK (resource_database->db,
+                  sqlite3_prepare_v2 (
+                      resource_database->db, sql, strlen (sql), &stmt, NULL));
+    o = Jnew ();
+    JSON ja = Jnew_ar();
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        Jadd_ar_str (ja, (const char *)sqlite3_column_text(stmt, 1));
+
+    }
+    json_object_object_add (o, "resrcs", ja);
+    sqlite3_free (sql);
+ret:
+    return (json_object*)o;
+}
 int resrc_release_resources (resources_t *resource_database,
                              resource_list_t *resrc_ids,
                              int64_t rel_job)
@@ -613,7 +721,7 @@ int resrc_release_resources (resources_t *resource_database,
     const char * const sql = "DELETE FROM job_link WHERE job_id = %lld AND job_link.resource_id in (SELECT id as resource_id from (%s))";
     const char *const deleter
         = sqlite3_mprintf (sql, rel_job, resrc_ids->query);
-    printf ("running deleter: %s\n", deleter);
+    /* printf ("running deleter: %s\n", deleter); */
     SQLITE_CHECK (resource_database->db,
                   sqlite3_exec (resource_database->db, deleter, 0, 0, NULL));
 
@@ -634,6 +742,193 @@ ret:
     return rc;
 }
 
+void resrc_tree_print (const resrc_tree_t *resrc_tree)
+{
+    resrc_t *resource = (resrc_t *)resrc_tree;
+
+    if (!resrc_tree) {
+        return;
+    }
+
+    resources_t *resource_database = &resource->resource_database;
+
+    char *sql = sqlite3_mprintf (
+        "SELECT id, type, name, local_id, state, uuid "
+        "FROM resources join ancestors on ancestors.resource_id = resources.id "
+        "WHERE ancestors.ancestor = %ld "
+        "ORDER BY id ASC ",
+        resource->id);
+
+    // Print all descendents of the resource passed in, in order of ID
+
+    SQLITE_CHECK (resource_database->db,
+                  sqlite3_exec (resource_database->db,
+                                sql,
+                                print_columns_and_data,
+                                resource_database,
+                                NULL));
+}
+
+char *build_query_string (const char *fields,
+                          JSON request,
+                          bool group_each_level)
+{
+    char *base_from = "resources as r_l0 ";
+    char *base_where = "r_l0.type LIKE '%s'";
+    char *base_group = group_each_level ? "GROUP BY r_l0.id" : "";
+
+    const char *base_type = NULL;
+    int base_qty = 0;
+    Jget_str (request, "type", &base_type);
+    Jget_int (request, "req_qty", &base_qty);
+
+    char *from = xstrdup (base_from);
+    char *where;
+    asprintf (&where, base_where, base_type);
+    char *group = xstrdup (base_group);
+
+    JSON child_walker = request;
+    Jget_obj (request, "req_child", &child_walker);
+    for (int level = 1; child_walker;
+         child_walker = Jobj_get (child_walker, "req_child"), level++) {
+        const char *type = NULL;
+        int qty = 0;
+
+        Jget_str (child_walker, "type", &type);
+        Jget_int (child_walker, "req_qty", &qty);
+
+        printf ("Got type: %s\n", type);
+
+        char *new_from;
+        asprintf (&new_from,
+                  " %3$s "
+                  " JOIN ancestors as a_l%1$d ON r_l%2$d.id = a_l%1$d.ancestor "
+                  " JOIN resources as r_l%1$d ON r_l%1$d.id = "
+                  "a_l%1$d.resource_id ",
+                  level,
+                  level - 1,
+                  from);
+        free (from);
+        from = new_from;
+
+        // FIXME: would much rather use mprintf here, but no positional
+        // arguments
+        char *new_where;
+        asprintf (&new_where,
+                  " %1$s "
+                  "AND r_l%2$d.type like '%3$s' ",
+                  where,
+                  level,
+                  type);
+        free (where);
+        where = new_where;
+
+        if (group_each_level) {
+            char *new_group;
+            asprintf (&new_group,
+                      " %1$s "
+                      ",  r_l%2$d.type ",
+                      group,
+                      level);
+            free (group);
+            group = new_group;
+        }
+    }
+
+    const char *sql = "SELECT %s FROM %s WHERE %s %s";
+    char *ret = sqlite3_mprintf (sql, fields, from, where, group);
+    free (from);
+    free (where);
+    free (group);
+    /* printf ("New multilevel query string: %s\n", ret); */
+    return ret;
+}
+
+int resrc_tree_search_multilevel_count (const resource_list_t *ids,
+                                        JSON req_res,
+                                        bool available)
+{
+    sqlite3 *db = ids->db;
+
+    // Build a counting string
+    char *sql = build_query_string ("count(*)", req_res, false);
+    sqlite3_stmt *stmt = NULL;
+    SQLITE_CHECK (db, sqlite3_prepare_v2 (db, sql, strlen (sql), &stmt, NULL));
+    if (sqlite3_step (stmt) != SQLITE_ROW)
+        return 0;
+
+    // FIXME: this is slicing, but the interface of resrc assumes int
+    int ret = sqlite3_column_int64 (stmt, 0);
+    SQLITE_CHECK (db, sqlite3_finalize (stmt));
+    sqlite3_free (sql);
+    return ret;
+}
+
+int resrc_tree_search_multilevel (const resource_list_t *ids,
+                                  resource_list_t *found,
+                                  JSON req_res,
+                                  bool available)
+{
+    sqlite3 *db = ids->db;
+    int ret = resrc_tree_search_multilevel_count (ids, req_res, available);
+
+    if (ret <= 0) {
+        goto done;
+    }
+
+    char *sql = build_query_string ("r_l0.id as id", req_res, true);
+
+    found->query = sql;
+    found->db = db;
+    found->stmt = NULL;
+
+done:
+    return ret;
+}
+
+/* returns the number of composites found */
+int resrc_tree_search (const resource_list_t *ids,
+                       resource_list_t *found,
+                       JSON req_res,
+                       bool available)
+{
+    if (!ids || !req_res) {
+        return -1;
+    }
+
+    struct resources resource_pack = {.db = ids->db};
+    JSON req_child = NULL;
+    Jget_obj (req_res, "req_child", &req_child);
+
+    if (!req_child) {
+        printf ("TREE: running flat search\n");
+        return resrc_search_flat_resources (&resource_pack,
+                                            found,
+                                            req_res,
+                                            available);
+    } else {
+        printf ("TREE: running multilevel search\n");
+        return resrc_tree_search_multilevel (ids, found, req_res, available);
+    }
+}
+
+const resrc_tree_t *resrc_phys_tree (const resrc_t *resrc)
+{
+    return (resrc_tree_t *)resrc;
+}
+
+resource_list_t *resrc_tree_children (const resrc_tree_t *resrc_tree)
+{
+    const resrc_t *r = (resrc_t *)resrc_tree;
+    resource_list_t *list = resrc_new_id_list ();
+    resrc_search_by_id (&r->resource_database, list, r->id);
+    return list;
+}
+
+int64_t resrc_id (const resrc_t *resrc)
+{
+    return resrc->id;
+}
 
 /*
  * vi: ts=4 sw=4 expandtab

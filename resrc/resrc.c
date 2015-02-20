@@ -66,21 +66,21 @@ struct resrc {
  *  API
  ***************************************************************************/
 
-const char *resrc_type (resrc_t *resrc)
+const char *resrc_type (const resrc_t *resrc)
 {
     if (resrc)
         return resrc->type;
     return NULL;
 }
 
-const char *resrc_name (resrc_t *resrc)
+const char *resrc_name (const resrc_t *resrc)
 {
     if (resrc)
         return resrc->name;
     return NULL;
 }
 
-resrc_tree_t *resrc_phys_tree (resrc_t *resrc)
+const resrc_tree_t *resrc_phys_tree (const resrc_t *resrc)
 {
     if (resrc)
         return resrc->phys_tree;
@@ -112,12 +112,12 @@ void resrc_id_list_destroy (resource_list_t *resrc_ids_in)
     }
 }
 
-const unsigned char *resrc_list_first (resource_list_t *rl)
+const resrc_t *resrc_list_first (resource_list_t *rl)
 {
     return zlist_first ((zlist_t*)rl);
 }
 
-const unsigned char *resrc_list_next (resource_list_t *rl)
+const resrc_t *resrc_list_next (resource_list_t *rl)
 {
     return zlist_next ((zlist_t*)rl);
 }
@@ -178,10 +178,9 @@ resrc_t *resrc_copy_resource (resrc_t *resrc)
     return new_resrc;
 }
 
-void resrc_resource_destroy (void *object)
+void resrc_resource_destroy (resrc_t *resrc)
 {
     int64_t *id_ptr;
-    resrc_t *resrc = (resrc_t *) object;
 
     if (resrc) {
         if (resrc->type)
@@ -246,7 +245,7 @@ static resrc_t *resrc_add_resource (zhash_t *resrcs, resrc_t *parent,
         resrc_tree = resrc_tree_new (parent_tree, resrc);
         resrc->phys_tree = resrc_tree;
         zhash_insert (resrcs, fullname, resrc);
-        zhash_freefn (resrcs, fullname, resrc_resource_destroy);
+        zhash_freefn (resrcs, fullname, (void(*)(void*))resrc_resource_destroy);
 
         while ((c = rdl_resource_next_child (r))) {
             child_resrc = resrc_add_resource (resrcs, resrc, c);
@@ -512,6 +511,12 @@ int resrc_release_resources (resources_t *resrcs_in,
 ret:
     return rc;
 }
+
+int64_t resrc_id (const resrc_t *resrc){
+    return resrc->id;
+}
+
+
 
 /*
  * vi: ts=4 sw=4 expandtab

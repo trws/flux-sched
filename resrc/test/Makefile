@@ -12,7 +12,7 @@ export CFLAGS TESTRESRC_INPUT_FILE LUA_PATH LUA_CPATH
 
 LDADD_CLI = $(FLUX_SRCDIR)/src/common/libutil/.libs/libutil.a
 
-BUILD = tresrc flat_test
+BUILD = tresrc flat_test tresrc_sqlite flat_test_sqlite
 
 all: $(BUILD)
 
@@ -21,6 +21,9 @@ tresrc: tresrc.o
 
 flat_test: flat_test.o
 	$(CC) -o $@ $^ $(RESRC_LIBS) $(LIBS) $(LDADD_CLI) 
+
+tresrc_sqlite: tresrc.o
+	$(CC) -o $@ $^ $(RESRC_SQLITE_LIBS) $(LIBS) $(LDADD_CLI)
 
 flat_test_sqlite: flat_test.o
 	$(CC) -o $@ $^ $(RESRC_SQLITE_LIBS) $(LIBS) $(LDADD_CLI) 

@@ -11,7 +11,7 @@
 /*
  * Return the list of child resource trees for the resouce tree input
  */
-resource_list_t *resrc_tree_children (resrc_tree_t *resrc_tree);
+resource_list_t *resrc_tree_children (const resrc_tree_t *resrc_tree);
 
 /*
  * Create a new resrc_tree_t object
@@ -36,7 +36,7 @@ void resrc_tree_destroy (resrc_tree_t *resrc_tree);
 /*
  * Print the resources in a resrc_tree_t object
  */
-void resrc_tree_print (resrc_tree_t *resrc_tree);
+void resrc_tree_print (const resrc_tree_t *resrc_tree);
 
 /*
  * Search a list of resource trees for a specific, composite resource
@@ -48,7 +48,7 @@ void resrc_tree_print (resrc_tree_t *resrc_tree);
  * Returns: the number of matching resource composites found
  *          found     - any resources found are added to this list
  */
-int resrc_tree_search (resource_list_t *resrcs, resource_list_t *found,
+int resrc_tree_search (const resource_list_t *resrcs, resource_list_t *found,
                        JSON req_res, bool available);
 
 

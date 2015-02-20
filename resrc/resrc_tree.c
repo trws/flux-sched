@@ -44,7 +44,7 @@ struct resrc_tree {
  *  API
  ***************************************************************************/
 
-resource_list_t *resrc_tree_children (resrc_tree_t *resrc_tree)
+resource_list_t *resrc_tree_children (const resrc_tree_t *resrc_tree)
 {
     if (resrc_tree)
         return (resource_list_t *)resrc_tree->children;
@@ -96,7 +96,7 @@ void resrc_tree_destroy (resrc_tree_t *resrc_tree)
     }
 }
 
-void resrc_tree_print (resrc_tree_t *resrc_tree)
+void resrc_tree_print (const resrc_tree_t *resrc_tree)
 {
     resrc_tree_t *child;
 
@@ -113,7 +113,7 @@ void resrc_tree_print (resrc_tree_t *resrc_tree)
 }
 
 /* returns the number of composites found */
-int resrc_tree_search (resource_list_t *resrcs_in, resource_list_t *found_in,
+int resrc_tree_search (const resource_list_t *resrcs_in, resource_list_t *found_in,
                        JSON req_res, bool available)
 {
     zlist_t * resrcs = (zlist_t*)resrcs_in;
