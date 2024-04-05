@@ -420,6 +420,7 @@ int dfu_impl_t::rem_agfilter (vtx_t u, int64_t jobid, const std::string &subsyst
         m_err_msg += strerror (errno);
         m_err_msg += "\n";
     }
+    job2span.erase (jobid);
 
 done:
     return rc;
