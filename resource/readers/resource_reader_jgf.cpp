@@ -1274,10 +1274,10 @@ int resource_reader_jgf_t::remove_subgraph (resource_graph_t &g,
 
     get_subgraph_vertices (g, subgraph_root_vtx, vtx_list);
 
-    if (get_parent_vtx (g, subgraph_root_vtx, parent_vtx))
+    if (get_parent_vtx (g, subgraph_root_vtx, parent_vtx) != 0)
         return -1;
 
-    if (remove_metadata_outedges (parent_vtx, subgraph_root_vtx, g, m))
+    if (remove_metadata_outedges (parent_vtx, subgraph_root_vtx, g, m) != 0)
         return -1;
 
     for (auto &vtx : vtx_list) {
