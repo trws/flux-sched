@@ -23,6 +23,20 @@ struct vmap_val_t;
 namespace Flux {
 namespace resource_model {
 
+// Struct to track data for updates
+struct jgf_updater_data {
+    int64_t jobid = 0;
+    int64_t at = 0;
+    uint64_t duration = 0;
+    bool reserved = false;
+    // track counts of resources to be cancelled
+    std::unordered_map<const char *, int64_t> type_to_count;
+    // track count of rank vertices to determine if rank
+    // should be removed from by_rank map
+    std::unordered_set<int64_t> ranks;
+    bool update = true;  // Updating or partial cancel
+};
+
 /*! JGF resource reader class.
  */
 class resource_reader_jgf_t : public resource_reader_base_t {
@@ -149,18 +163,17 @@ class resource_reader_jgf_t : public resource_reader_base_t {
     int update_vtx_plan (vtx_t v,
                          resource_graph_t &g,
                          const fetch_helper_t &fetcher,
-                         uint64_t jobid,
-                         int64_t at,
-                         uint64_t dur,
-                         bool rsv);
+                         jgf_updater_data &update_data);
+    int cancel_vtx (vtx_t v,
+                    resource_graph_t &g,
+                    resource_graph_metadata_t &m,
+                    const fetch_helper_t &fetcher,
+                    jgf_updater_data &update_data);
     int update_vtx (resource_graph_t &g,
                     resource_graph_metadata_t &m,
                     std::map<std::string, vmap_val_t> &vmap,
                     const fetch_helper_t &fetcher,
-                    uint64_t jobid,
-                    int64_t at,
-                    uint64_t dur,
-                    bool rsv);
+                    jgf_updater_data &updater_data);
     int unpack_vertices (resource_graph_t &g,
                          resource_graph_metadata_t &m,
                          std::map<std::string, vmap_val_t> &vmap,
@@ -168,23 +181,12 @@ class resource_reader_jgf_t : public resource_reader_base_t {
                          std::unordered_set<std::string> &added_vtcs);
     int undo_vertices (resource_graph_t &g,
                        std::map<std::string, vmap_val_t> &vmap,
-                       uint64_t jobid,
-                       bool rsv);
+                       jgf_updater_data &updater_data);
     int update_vertices (resource_graph_t &g,
                          resource_graph_metadata_t &m,
                          std::map<std::string, vmap_val_t> &vmap,
                          json_t *nodes,
-                         int64_t jobid,
-                         int64_t at,
-                         uint64_t dur,
-                         bool rsv);
-    int update_vertices (resource_graph_t &g,
-                         resource_graph_metadata_t &m,
-                         std::map<std::string, vmap_val_t> &vmap,
-                         json_t *nodes,
-                         int64_t jobid,
-                         int64_t at,
-                         uint64_t dur);
+                         jgf_updater_data &updater_data);
     int unpack_edge (json_t *element,
                      std::map<std::string, vmap_val_t> &vmap,
                      std::string &source,
