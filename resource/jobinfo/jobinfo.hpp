@@ -11,6 +11,7 @@
 #ifndef JOBINFO_HPP
 #define JOBINFO_HPP
 
+#include <cstdint>
 #include <string>
 #include <stdint.h>
 
@@ -20,12 +21,18 @@ namespace resource_model {
 enum class job_lifecycle_t { INIT, ALLOCATED, RESERVED, CANCELED, ERROR };
 
 struct job_info_t {
+    job_info_t () = default;
+    job_info_t (uint64_t j);
     job_info_t (uint64_t j, job_lifecycle_t s, int64_t at,
                 const std::string &j_fn, const std::string &jstr,
                 const std::string &R_str,  double o);
 
     job_info_t (uint64_t j, job_lifecycle_t s, int64_t at,
                 const std::string &j_fn, const std::string &jstr, double o);
+    job_info_t (job_info_t const &) = default;
+    job_info_t (job_info_t &&) = default;
+    job_info_t& operator= (job_info_t const &) = default;
+    job_info_t& operator= (job_info_t &&) = default;
 
     uint64_t jobid = UINT64_MAX;
     job_lifecycle_t state = job_lifecycle_t::INIT;

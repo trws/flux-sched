@@ -20,6 +20,7 @@ extern "C" {
 namespace Flux {
 namespace resource_model {
 
+job_info_t::job_info_t(uint64_t j) : jobid(j) {}
 job_info_t::job_info_t (uint64_t j, job_lifecycle_t s, int64_t at, const std::string &fn,
                         const std::string &jstr, const std::string &R_str,  double o)
     : jobid (j), state (s), scheduled_at (at), jobspec_fn (fn), jobspec_str (jstr),

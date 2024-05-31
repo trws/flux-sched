@@ -127,7 +127,7 @@ struct resource_ctx_t : public resource_interface_t {
     std::shared_ptr<match_writers_t> writers;   /* Vertex/Edge writers */
     std::shared_ptr<resource_reader_base_t> reader; /* resource reader */
     match_perf_t perf;             /* Match performance stats */
-    std::map<uint64_t, std::shared_ptr<job_info_t>> jobs; /* Jobs table */
+    std::map<uint64_t, job_info_t> jobs; /* Jobs table */
     std::map<uint64_t, uint64_t> allocations;  /* Allocation table */
     std::map<uint64_t, uint64_t> reservations; /* Reservation table */
     std::map<std::string, std::shared_ptr<msg_wrap_t>> notify_msgs;
@@ -140,6 +140,43 @@ struct resource_ctx_t : public resource_interface_t {
     json_t *m_r_all;
     json_t *m_r_down;
     json_t *m_r_alloc;
+
+    int register_job (int64_t id) {
+        this->jobs.emplace(id, id);
+        return 0;
+    }
+    int update_schedule_info (
+            int64_t id, bool reserved, int64_t at,
+            const std::string &jspec,
+            const std::stringstream &R, double elapse)
+    {
+        if (id < 0 || at < 0) {
+            errno = EINVAL;
+            return -1;
+        }
+        try {
+            job_lifecycle_t state = (!reserved)? job_lifecycle_t::ALLOCATED
+                : job_lifecycle_t::RESERVED;
+            auto &job = jobs[id];
+            job.jobid = id;
+            job.state = state;
+            job.scheduled_at = at;
+            job.jobspec_fn = "";
+            job.jobspec_str = jspec;
+            job.R = R.str();
+            job.overhead = elapse;
+            if (!reserved)
+                this->allocations[id] = id;
+            else
+                this->reservations[id] = id;
+        }
+        catch (std::bad_alloc &e) {
+            errno = ENOMEM;
+            return -1;
+        }
+        return 0;
+    }
+
 };
 
 msg_wrap_t::msg_wrap_t (const msg_wrap_t &o)
@@ -1542,33 +1579,10 @@ static inline bool is_existent_jobid (
                        const std::shared_ptr<resource_ctx_t> &ctx,
                        uint64_t jobid)
 {
-    return (ctx->jobs.find (jobid) != ctx->jobs.end ())? true : false;
-}
-
-static int track_schedule_info (std::shared_ptr<resource_ctx_t> &ctx,
-                                int64_t id, bool reserved, int64_t at,
-                                const std::string &jspec,
-                                const std::stringstream &R, double elapse)
-{
-    if (id < 0 || at < 0) {
-        errno = EINVAL;
-        return -1;
-    }
-    try {
-        job_lifecycle_t state = (!reserved)? job_lifecycle_t::ALLOCATED
-                                           : job_lifecycle_t::RESERVED;
-        ctx->jobs[id] = std::make_shared<job_info_t> (id, state, at, "",
-                                                      jspec, R.str (), elapse);
-        if (!reserved)
-            ctx->allocations[id] = id;
-        else
-            ctx->reservations[id] = id;
-    }
-    catch (std::bad_alloc &e) {
-        errno = ENOMEM;
-        return -1;
-    }
-    return 0;
+    auto iter = ctx->jobs.find (jobid);
+    if (iter == ctx->jobs.end())
+        return false;
+    return true;
 }
 
 static int parse_R (std::shared_ptr<resource_ctx_t> &ctx, const char *R,
@@ -1765,6 +1779,9 @@ static int run_match (std::shared_ptr<resource_ctx_t> &ctx, int64_t jobid,
     std::chrono::duration<int64_t> epoch;
     bool rsv = false;
 
+    if (cmd != std::string ("satisfiability")) {
+        ctx->register_job (jobid);
+    }
     start = std::chrono::system_clock::now ();
     if (strcmp ("allocate", cmd) != 0
         && strcmp ("allocate_orelse_reserve", cmd) != 0
@@ -1796,7 +1813,7 @@ static int run_match (std::shared_ptr<resource_ctx_t> &ctx, int64_t jobid,
     update_match_perf (ctx, *overhead, true);
 
     if (cmd != std::string ("satisfiability")) {
-        if ( (rc = track_schedule_info (ctx, jobid,
+        if ( (rc =  ctx->update_schedule_info (jobid,
                                         rsv, *at, jstr, o, *overhead)) != 0) {
             flux_log_error (ctx->h, "%s: can't add job info (id=%jd)",
                             __FUNCTION__, (intmax_t)jobid);
@@ -1838,7 +1855,7 @@ static int run_update (std::shared_ptr<resource_ctx_t> &ctx, int64_t jobid,
     elapsed = std::chrono::system_clock::now () - start;
     overhead = elapsed.count ();
     update_match_perf (ctx, overhead, true);
-    if ( (rc = track_schedule_info (ctx, jobid, false, at, "", o, overhead)) != 0) {
+    if ( (rc = ctx->update_schedule_info (jobid, false, at, "", o, overhead)) != 0) {
         flux_log_error (ctx->h, "%s: can't add job info (id=%jd)",
                         __FUNCTION__, (intmax_t)jobid);
         goto done;
@@ -1871,7 +1888,7 @@ static void update_request_cb (flux_t *h, flux_msg_handler_t *w,
     if (is_existent_jobid (ctx, jobid)) {
         int rc = 0;
         start = std::chrono::system_clock::now ();
-        if ( (rc = Rlite_equal (ctx, R, ctx->jobs[jobid]->R.c_str ())) < 0) {
+        if ( (rc = Rlite_equal (ctx, R, ctx->jobs[jobid].R.c_str ())) < 0) {
             flux_log_error (ctx->h, "%s: Rlite_equal", __FUNCTION__);
             goto error;
         } else if (rc == 1) {
@@ -1884,9 +1901,9 @@ static void update_request_cb (flux_t *h, flux_msg_handler_t *w,
         elapsed = std::chrono::system_clock::now () - start;
         // If a jobid with matching R exists, no need to update
         overhead = elapsed.count ();
-        get_jobstate_str (ctx->jobs[jobid]->state, status);
-        o << ctx->jobs[jobid]->R;
-        at = ctx->jobs[jobid]->scheduled_at;
+        get_jobstate_str (ctx->jobs[jobid].state, status);
+        o << ctx->jobs[jobid].R;
+        at = ctx->jobs[jobid].scheduled_at;
         flux_log (ctx->h, LOG_DEBUG, "%s: jobid (%jd) with matching R exists",
                   __FUNCTION__, static_cast<intmax_t> (jobid));
     } else if (run_update (ctx, jobid, R, at, overhead, o) < 0) {
@@ -1928,8 +1945,8 @@ static int run_remove (std::shared_ptr<resource_ctx_t> &ctx, int64_t jobid)
            // removed multiple times by the upper queuing layer
            // as part of providing advanced queueing policies
            // (e.g., conservative backfill).
-           std::shared_ptr<job_info_t> info = ctx->jobs[jobid];
-           info->state = job_lifecycle_t::ERROR;
+           job_info_t &info = ctx->jobs[jobid];
+           info.state = job_lifecycle_t::ERROR;
         }
         goto out;
     }
@@ -2110,32 +2127,28 @@ static void info_request_cb (flux_t *h, flux_msg_handler_t *w,
 {
     std::shared_ptr<resource_ctx_t> ctx = getctx ((flux_t *)arg);
     int64_t jobid = -1;
-    std::shared_ptr<job_info_t> info = NULL;
     std::string status = "";
 
     if (flux_request_unpack (msg, NULL, "{s:I}", "jobid", &jobid) < 0)
-        goto error;
+        if (flux_respond_error (h, msg, errno, NULL) < 0)
+            flux_log_error (h, "%s:%d: flux_respond_error", __FUNCTION__, __LINE__);
     if (!is_existent_jobid (ctx, jobid)) {
         errno = ENOENT;
         flux_log (h, LOG_DEBUG, "%s: nonexistent job (id=%jd)",
-                  __FUNCTION__,  (intmax_t)jobid);
-        goto error;
+                __FUNCTION__,  (intmax_t)jobid);
+        if (flux_respond_error (h, msg, errno, NULL) < 0)
+            flux_log_error (h, "%s:%d: flux_respond_error", __FUNCTION__, __LINE__);
+        return;
     }
 
-    info = ctx->jobs[jobid];
-    get_jobstate_str (info->state, status);
+    job_info_t &info = ctx->jobs[jobid];
+    get_jobstate_str (info.state, status);
     if (flux_respond_pack (h, msg, "{s:I s:s s:I s:f}",
                                    "jobid", jobid,
                                    "status", status.c_str (),
-                                   "at", info->scheduled_at,
-                                   "overhead", info->overhead) < 0)
+                                   "at", info.scheduled_at,
+                                   "overhead", info.overhead) < 0)
         flux_log_error (h, "%s", __FUNCTION__);
-
-    return;
-
-error:
-    if (flux_respond_error (h, msg, errno, NULL) < 0)
-        flux_log_error (h, "%s: flux_respond_error", __FUNCTION__);
 }
 
 static int get_stat_by_rank (std::shared_ptr<resource_ctx_t>& ctx, json_t *o)
@@ -2308,8 +2321,7 @@ static void stat_clear_cb (flux_t *h, flux_msg_handler_t *w,
         flux_log_error (h, "%s: flux_respond", __FUNCTION__);
 }
 
-static inline int64_t next_jobid (const std::map<uint64_t,
-                                            std::shared_ptr<job_info_t>> &m)
+static inline int64_t next_jobid (const decltype(resource_ctx_t::jobs) &m)
 {
     int64_t jobid = -1;
     if (m.empty ())
