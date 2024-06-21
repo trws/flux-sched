@@ -73,6 +73,7 @@ int cmd_attach (std::shared_ptr<resource_context_t> &ctx, std::vector<std::strin
 int cmd_remove (std::shared_ptr<resource_context_t> &ctx, std::vector<std::string> &args);
 int cmd_find (std::shared_ptr<resource_context_t> &ctx, std::vector<std::string> &args);
 int cmd_cancel (std::shared_ptr<resource_context_t> &ctx, std::vector<std::string> &args);
+int cmd_partial_cancel (std::shared_ptr<resource_context_t> &ctx, std::vector<std::string> &args);
 int cmd_set_property (std::shared_ptr<resource_context_t> &ctx, std::vector<std::string> &args);
 int cmd_get_property (std::shared_ptr<resource_context_t> &ctx, std::vector<std::string> &args);
 int cmd_set_status (std::shared_ptr<resource_context_t> &ctx, std::vector<std::string> &args);
