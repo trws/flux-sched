@@ -148,6 +148,11 @@ class reapi_cli_t : public reapi_t {
                                 double &ov,
                                 std::string &R_out);
     static int cancel (void *h, const uint64_t jobid, bool noent_ok);
+    static int cancel (void *h,
+                       const uint64_t jobid,
+                       const std::string &R,
+                       bool noent_ok,
+                       bool &full_removal);
     static int find (void *h, std::string criteria, json_t *&o);
     static int info (void *h,
                      const uint64_t jobid,

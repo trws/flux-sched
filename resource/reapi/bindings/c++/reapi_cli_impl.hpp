@@ -199,6 +199,15 @@ out:
     return rc;
 }
 
+int reapi_cli_t::cancel (void *h,
+                         const uint64_t jobid,
+                         const std::string &R,
+                         bool noent_ok,
+                         bool &full_removal)
+{
+    return 0;
+}
+
 int reapi_cli_t::find (void *h, std::string criteria, json_t *&o)
 {
     int rc = -1;
