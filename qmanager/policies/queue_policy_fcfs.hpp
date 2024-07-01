@@ -31,9 +31,13 @@ class queue_policy_fcfs_t : public queue_policy_base_t {
                                       int64_t at,
                                       double ov);
     virtual int handle_match_failure (flux_jobid_t jobid, int errcode);
+    int cancel (void *h,
+                flux_jobid_t id,
+                const char *R,
+                bool noent_ok,
+                bool &full_removal) override;
 
    private:
-    int cancel_completed_jobs (void *h);
     int pack_jobs (json_t *jobs);
     int allocate_jobs (void *h, bool use_alloced_queue);
     bool m_queue_depth_limit = false;
