@@ -191,19 +191,19 @@ std::string diff (const resource_pool_t &r, const fetch_helper_t &f)
         sstream << " name=(" << r.name << ", " << f.name << ")";
     if (r.properties != f.properties) {
         sstream << " properties=(";
-        for (auto &kv : r.properties)
+        for (const auto &kv : r.properties)
             sstream << kv.first << "=" << kv.second << " ";
         sstream << ", ";
-        for (auto &kv : f.properties)
+        for (const auto &kv : f.properties)
             sstream << kv.first << "=" << kv.second << " ";
         sstream << ")";
     }
     if (r.paths != f.paths) {
         sstream << " paths=(";
-        for (auto &kv : r.paths)
+        for (const auto &kv : r.paths)
             sstream << kv.first << "=" << kv.second << " ";
         sstream << ", ";
-        for (auto &kv : f.paths)
+        for (const auto &kv : f.paths)
             sstream << kv.first << "=" << kv.second << " ";
         sstream << ")";
     }
@@ -460,7 +460,7 @@ vtx_t resource_reader_jgf_t::create_vtx (resource_graph_t &g, const fetch_helper
     g[v].paths = fetcher.paths;
     g[v].schedule.plans = plans;
     g[v].idata.x_checker = x_checker;
-    for (auto kv : g[v].paths)
+    for (const auto &kv : g[v].paths)
         g[v].idata.member_of[kv.first] = "*";
 
 done:
@@ -472,10 +472,10 @@ vtx_t resource_reader_jgf_t::vtx_in_graph (const resource_graph_t &g,
                                            const std::map<std::string, std::string> &paths,
                                            int rank)
 {
-    for (auto const &paths_it : paths) {
+    for (const auto &paths_it : paths) {
         auto iter = m.by_path.find (paths_it.second);
         if (iter != m.by_path.end ()) {
-            for (auto &v : iter->second) {
+            for (const auto &v : iter->second) {
                 if (g[v].rank == rank) {
                     return v;
                 }
@@ -497,7 +497,7 @@ int resource_reader_jgf_t::check_root (vtx_t v,
 {
     int rc = -1;
     std::pair<std::map<std::string, bool>::iterator, bool> ptr;
-    for (auto kv : g[v].paths) {
+    for (const auto &kv : g[v].paths) {
         if (is_root (kv.second)) {
             ptr = is_roots.emplace (kv.first, true);
             if (!ptr.second)
@@ -517,7 +517,7 @@ int resource_reader_jgf_t::add_graph_metadata (vtx_t v,
     int rc = -1;
     std::pair<std::map<std::string, vtx_t>::iterator, bool> ptr;
 
-    for (auto kv : g[v].paths) {
+    for (const auto &kv : g[v].paths) {
         if (is_root (kv.second)) {
             ptr = m.roots.emplace (kv.first, v);
             if (!ptr.second) {
@@ -545,7 +545,7 @@ int resource_reader_jgf_t::remove_graph_metadata (vtx_t v,
                                                   resource_graph_metadata_t &m)
 {
     int rc = -1;
-    for (auto kv : g[v].paths) {
+    for (auto &kv : g[v].paths) {
         m.by_path.erase (kv.second);
     }
 
@@ -663,7 +663,7 @@ int resource_reader_jgf_t::exist (resource_graph_t &g,
 {
     try {
         auto &vect = m.by_path.at (path);
-        for (auto &u : vect) {
+        for (const auto &u : vect) {
             if (g[u].rank == rank) {
                 v = u;
                 return 0;
@@ -700,7 +700,7 @@ int resource_reader_jgf_t::find_vtx (resource_graph_t &g,
         goto done;
     }
 
-    for (auto &kv : fetcher.paths) {
+    for (const auto &kv : fetcher.paths) {
         if (exist (g, m, kv.second, fetcher.rank, fetcher.vertex_id, u) < 0)
             goto done;
         if (v == nullvtx) {
@@ -893,7 +893,7 @@ int resource_reader_jgf_t::undo_vertices (resource_graph_t &g,
     planner_t *plans = NULL;
     vtx_t v = boost::graph_traits<resource_graph_t>::null_vertex ();
 
-    for (auto &kv : vmap) {
+    for (const auto &kv : vmap) {
         if (kv.second.exclusive != 1)
             continue;
         try {
@@ -1109,7 +1109,7 @@ int resource_reader_jgf_t::update_src_edge (resource_graph_t &g,
     if (vmap[source].is_roots.empty ())
         return 0;
 
-    for (auto &kv : vmap[source].is_roots)
+    for (const auto &kv : vmap[source].is_roots)
         m.v_rt_edges[kv.first].set_for_trav_update (vmap[source].needs,
                                                     vmap[source].exclusive,
                                                     token);
@@ -1193,7 +1193,7 @@ int resource_reader_jgf_t::get_subgraph_vertices (resource_graph_t &g,
     for (; ei != ei_end; ++ei) {
         next_vtx = boost::target (*ei, g);
 
-        for (auto const &paths_it : g[next_vtx].paths) {
+        for (const auto &paths_it : g[next_vtx].paths) {
             // check that we don't recurse on parent edges
             if (paths_it.second.find (g[vtx].name) != std::string::npos
                 && paths_it.second.find (g[vtx].name) < paths_it.second.find (g[next_vtx].name)) {
@@ -1217,7 +1217,7 @@ int resource_reader_jgf_t::get_parent_vtx (resource_graph_t &g, vtx_t vtx, vtx_t
 
     for (; ei != ei_end; ++ei) {
         next_vtx = boost::target (*ei, g);
-        for (auto const &paths_it : g[vtx].paths) {
+        for (const auto &paths_it : g[vtx].paths) {
             // check that the parent's name exists in the child's path before the child's name
             if (paths_it.second.find (g[next_vtx].name) != std::string::npos
                 && paths_it.second.find (g[vtx].name) > paths_it.second.find (g[next_vtx].name)) {
@@ -1345,7 +1345,7 @@ int resource_reader_jgf_t::remove_subgraph (resource_graph_t &g,
         return -1;
     }
 
-    for (auto &v : iter->second) {
+    for (const auto &v : iter->second) {
         subgraph_root_vtx = v;
     }
 
