@@ -34,24 +34,20 @@ extern "C" {
 namespace Flux {
 namespace queue_manager {
 
-enum class job_state_kind_t { INIT,
-                              PENDING,
-                              REJECTED,
-                              RUNNING,
-                              ALLOC_RUNNING,
-                              CANCELED,
-                              COMPLETE };
+enum class job_state_kind_t { INIT, PENDING, REJECTED, RUNNING, ALLOC_RUNNING, CANCELED, COMPLETE };
 
 /*! Type to store schedule information such as the
  *  allocated or reserved (for backfill) resource set (R).
  */
 struct schedule_t {
     schedule_t () = default;
-    schedule_t (const std::string &r) : R (r) { }
+    schedule_t (const std::string &r) : R (r)
+    {
+    }
     schedule_t (schedule_t &&s) = default;
     schedule_t (const schedule_t &s) = default;
-    schedule_t& operator= (schedule_t &&s) = default;
-    schedule_t& operator= (const schedule_t &s) = default;
+    schedule_t &operator= (schedule_t &&s) = default;
+    schedule_t &operator= (const schedule_t &s) = default;
     std::string R = "";
     bool reserved = false;
     int64_t at = 0;
@@ -80,27 +76,34 @@ using job_map_iter = job_map_t::iterator;
 /*! Type to store a job's attributes.
  */
 class job_t {
-public:
-    ~job_t () { flux_msg_destroy (msg); }
+   public:
+    ~job_t ()
+    {
+        flux_msg_destroy (msg);
+    }
     job_t () = default;
-    job_t (job_state_kind_t s, flux_jobid_t jid,
-           uint32_t uid, unsigned int p, double t_s, const std::string &R)
-	   : state (s), id (jid), userid (uid),
-	     priority (p), t_submit (t_s), schedule (R) { }
+    job_t (job_state_kind_t s,
+           flux_jobid_t jid,
+           uint32_t uid,
+           unsigned int p,
+           double t_s,
+           const std::string &R)
+        : state (s), id (jid), userid (uid), priority (p), t_submit (t_s), schedule (R)
+    {
+    }
     job_t (job_t &&j) = default;
     job_t (const job_t &j) = default;
-    job_t& operator= (job_t &&s) = default;
-    job_t& operator= (const job_t &s) = default;
+    job_t &operator= (job_t &&s) = default;
+    job_t &operator= (const job_t &s) = default;
 
-    bool is_pending () { return state == job_state_kind_t::PENDING; }
-    pending_key get_key () {
-        return {
-            priority,
-            t_submit,
-            t_stamps.pending_ts
-        };
+    bool is_pending ()
+    {
+        return state == job_state_kind_t::PENDING;
     }
-
+    pending_key get_key ()
+    {
+        return {priority, t_submit, t_stamps.pending_ts};
+    }
 
     flux_msg_t *msg = NULL;
     job_state_kind_t state = job_state_kind_t::INIT;
@@ -114,15 +117,13 @@ public:
     schedule_t schedule;
 };
 
-
 /*! Queue policy base interface abstract class. Derived classes must
  *  implement its run_sched_loop and destructor methods. Insert, remove
  *  and pending_pop interface implementations are provided through
  *  its parent class (detail::queue_policy_base_impl_t).
  */
-class queue_policy_base_t : public resource_model::queue_adapter_base_t
-{
-public:
+class queue_policy_base_t : public resource_model::queue_adapter_base_t {
+   public:
     /*! The destructor that must be implemented by derived classes.
      *
      */
@@ -165,7 +166,8 @@ public:
      *                   execution.
      *                       EINVAL: invalid argument.
      */
-    virtual int cancel_sched_loop () {
+    virtual int cancel_sched_loop ()
+    {
         if (is_sched_loop_active ()) {
             errno = EINVAL;
             return -1;
@@ -192,11 +194,11 @@ public:
      *                       EPROTO: job->schedule.R doesn't comply.
      *                       ENOTSUP: job->schedule.R has unsupported feature.
      */
-    virtual int reconstruct_resource (void *h, std::shared_ptr<job_t> job,
-                                      std::string &ret_R) = 0;
+    virtual int reconstruct_resource (void *h, std::shared_ptr<job_t> job, std::string &ret_R) = 0;
 
     /// @brief move any jobs in blocked state to pending
-    void process_provisional_reconsider () {
+    void process_provisional_reconsider ()
+    {
         if (!m_pending_reconsider)
             return;
         m_pending_reconsider = false;
@@ -209,7 +211,8 @@ public:
     }
 
     /// @brief move any jobs in blocked state to pending
-    void reconsider_blocked_jobs () {
+    void reconsider_blocked_jobs ()
+    {
         m_pending_reconsider = true;
         if (!is_sched_loop_active ()) {
             process_provisional_reconsider ();
@@ -223,7 +226,8 @@ public:
      * \return           0 on success; -1 on error.
      *                       EINVAL: invalid argument.
      */
-    int set_queue_params (const std::string &params) {
+    int set_queue_params (const std::string &params)
+    {
         return set_params (params, m_qparams);
     }
 
@@ -234,19 +238,20 @@ public:
      * \return           0 on success; -1 on error.
      *                       EINVAL: invalid argument.
      */
-    int set_policy_params (const std::string &params) {
+    int set_policy_params (const std::string &params)
+    {
         return set_params (params, m_pparams);
     }
 
     /*! Apply the set policy parameters to the queuing policy.
      */
-    virtual int apply_params () {
+    virtual int apply_params ()
+    {
         int rc = 0;
         int depth = 0;
         try {
             std::unordered_map<std::string, std::string>::const_iterator i;
-            if ((i = m_qparams.find ("max-queue-depth"))
-                 != m_qparams.end ()) {
+            if ((i = m_qparams.find ("max-queue-depth")) != m_qparams.end ()) {
                 // We pre-check the input string to see if it is a positive number
                 // before passing it to std::stoi. This works around issues
                 // in some compilers where std::stoi aborts on certain
@@ -255,7 +260,7 @@ public:
                     errno = EINVAL;
                     rc += -1;
                 } else {
-                    if ( (depth = std::stoi (i->second)) < 1) {
+                    if ((depth = std::stoi (i->second)) < 1) {
                         errno = ERANGE;
                         rc += -1;
                     } else {
@@ -275,7 +280,7 @@ public:
                     errno = EINVAL;
                     rc += -1;
                 } else {
-                    if ( (depth = std::stoi (i->second)) < 1) {
+                    if ((depth = std::stoi (i->second)) < 1) {
                         errno = ERANGE;
                         rc += -1;
                     } else {
@@ -304,7 +309,8 @@ public:
      * \param p_p        string to which to print queue parameters
      *                   (e.g., "reservation-depth=1024,foo=bar")
      */
-    void get_params (std::string &q_p, std::string &p_p) {
+    void get_params (std::string &q_p, std::string &p_p)
+    {
         std::unordered_map<std::string, std::string>::const_iterator i;
         for (i = m_qparams.begin (); i != m_qparams.end (); i++) {
             if (!q_p.empty ())
@@ -322,7 +328,8 @@ public:
      *  is the depth of its pending-job queue only upto which it
      *  considers for scheduling to deal with unbounded queue length.
      */
-    unsigned int get_queue_depth () {
+    unsigned int get_queue_depth ()
+    {
         return m_queue_depth;
     }
 
@@ -332,7 +339,8 @@ public:
      *  \return          a shared pointer pointing to the job on success;
      *                       nullptr on error. ENOENT: unknown id.
      */
-    const std::shared_ptr<job_t> lookup (flux_jobid_t id) {
+    const std::shared_ptr<job_t> lookup (flux_jobid_t id)
+    {
         std::shared_ptr<job_t> job = nullptr;
         if (m_jobs.find (id) == m_jobs.end ()) {
             errno = ENOENT;
@@ -360,19 +368,20 @@ public:
      *                       EPROTO: job->schedule.R doesn't comply.
      *                       ENOTSUP: job->schedule.R has unsupported feature.
      */
-    int reconstruct (void *h, std::shared_ptr<job_t> job, std::string &R_out) {
+    int reconstruct (void *h, std::shared_ptr<job_t> job, std::string &R_out)
+    {
         int rc = 0;
-        if ( (rc = reconstruct_resource (h, job, R_out)) < 0)
+        if ((rc = reconstruct_resource (h, job, R_out)) < 0)
             return rc;
         return reconstruct_queue (job);
     }
-
 
     /* Query the first job from the pending job queue.
      * \return           a shared pointer pointing to a job_t object
      *                   on success; nullptr when the queue is empty.
      */
-    std::shared_ptr<job_t> pending_begin () {
+    std::shared_ptr<job_t> pending_begin ()
+    {
         std::shared_ptr<job_t> job_p = nullptr;
         m_pending_iter = m_pending.begin ();
         if (m_pending_iter == m_pending.end ()) {
@@ -390,7 +399,8 @@ public:
      * \return           a shared pointer pointing to a job_t object
      *                   on success; nullptr when the queue is empty.
      */
-    std::shared_ptr<job_t> pending_next () {
+    std::shared_ptr<job_t> pending_next ()
+    {
         std::shared_ptr<job_t> job_p = nullptr;
         if (!m_iter_valid)
             goto ret;
@@ -427,8 +437,7 @@ public:
         job->state = job_state_kind_t::PENDING;
         job->t_stamps.pending_ts = m_pq_cnt++;
         m_pending_provisional.emplace (job->get_key (), job->id);
-        m_jobs.insert (std::pair<flux_jobid_t, std::shared_ptr<job_t>> (job->id,
-                                                                        job));
+        m_jobs.insert (std::pair<flux_jobid_t, std::shared_ptr<job_t>> (job->id, job));
         set_schedulability (true);
         rc = 0;
     out:
@@ -444,7 +453,7 @@ public:
      *  \return          0 on success; -1 on error.
      *                       ENOENT: unknown id.
      */
-    int remove_pending (job_t *job) 
+    int remove_pending (job_t *job)
     {
         int rc = -1;
 
@@ -461,8 +470,7 @@ public:
             // cannot be determined. There is "MAYBE pending state" where
             // a request has been sent out to the match service.
             auto res = m_pending_cancel_provisional.insert (
-                            std::pair<uint64_t, flux_jobid_t> (
-                                job->t_stamps.canceled_ts, job->id));
+                std::pair<uint64_t, flux_jobid_t> (job->t_stamps.canceled_ts, job->id));
             if (!res.second) {
                 errno = EEXIST;
                 goto out;
@@ -473,8 +481,7 @@ public:
                 goto out;
             job->state = job_state_kind_t::CANCELED;
             auto res = m_canceled.insert (
-                            std::pair<uint64_t, flux_jobid_t> (
-                                job->t_stamps.canceled_ts, job->id));
+                std::pair<uint64_t, flux_jobid_t> (job->t_stamps.canceled_ts, job->id));
             if (!res.second) {
                 errno = EEXIST;
                 goto out;
@@ -508,23 +515,22 @@ public:
 
         job = m_jobs[id];
         switch (job->state) {
-        case job_state_kind_t::PENDING:
-            this->remove_pending(job.get ());
-            break;
-        case job_state_kind_t::ALLOC_RUNNING:
-            m_alloced.erase (job->t_stamps.running_ts);
-            // deliberately fall through
-        case job_state_kind_t::RUNNING:
-            m_running.erase (job->t_stamps.running_ts);
-            job->t_stamps.complete_ts = m_cq_cnt++;
-            job->state = job_state_kind_t::COMPLETE;
-            m_complete.insert (std::pair<uint64_t,
-                                        flux_jobid_t> (job->t_stamps.complete_ts,
-                                                       job->id));
-            set_schedulability (true);
-            break;
-        default:
-            break;
+            case job_state_kind_t::PENDING:
+                this->remove_pending (job.get ());
+                break;
+            case job_state_kind_t::ALLOC_RUNNING:
+                m_alloced.erase (job->t_stamps.running_ts);
+                // deliberately fall through
+            case job_state_kind_t::RUNNING:
+                m_running.erase (job->t_stamps.running_ts);
+                job->t_stamps.complete_ts = m_cq_cnt++;
+                job->state = job_state_kind_t::COMPLETE;
+                m_complete.insert (
+                    std::pair<uint64_t, flux_jobid_t> (job->t_stamps.complete_ts, job->id));
+                set_schedulability (true);
+                break;
+            default:
+                break;
         }
         // with a job finishing or being canceled, restart the sched loop
         cancel_sched_loop ();
@@ -613,8 +619,12 @@ public:
      *  resource API. When a match succeeds, this method is called back
      *  by reapi_t.
      */
-    int handle_match_success (flux_jobid_t jobid, const char *status,
-                              const char *R, int64_t at, double ov) override {
+    int handle_match_success (flux_jobid_t jobid,
+                              const char *status,
+                              const char *R,
+                              int64_t at,
+                              double ov) override
+    {
         return 0;
     }
 
@@ -623,10 +633,10 @@ public:
      *  resource API. When a match fails, this method is called back
      *  by reapi_t.
      */
-    int handle_match_failure (flux_jobid_t jobid, int errcode) override {
+    int handle_match_failure (flux_jobid_t jobid, int errcode) override
+    {
         return 0;
     }
-
 
     /*! Pop the first job from the pending job queue. The popped
      *  job is completely graduated from the queue policy layer.
@@ -634,7 +644,8 @@ public:
      *  \return          a shared pointer pointing to a job_t object
      *                   on success; nullptr when the queue is empty.
      */
-    std::shared_ptr<job_t> pending_pop () {
+    std::shared_ptr<job_t> pending_pop ()
+    {
         std::shared_ptr<job_t> job;
         flux_jobid_t id;
 
@@ -654,7 +665,8 @@ public:
      *  \return          a shared pointer pointing to a job_t object
      *                   on success; nullptr when the queue is empty.
      */
-    std::shared_ptr<job_t> complete_pop () {
+    std::shared_ptr<job_t> complete_pop ()
+    {
         std::shared_ptr<job_t> job;
         flux_jobid_t id;
         if (m_complete.empty ())
@@ -668,14 +680,14 @@ public:
         return job;
     }
 
-
     /*! Pop the first job from the alloced job queue. The popped
      *  job still remains in the queue policy layer (i.e., in the
      *  internal running job queue).
      *  \return          a shared pointer pointing to a job_t object
      *                   on success; nullptr when the queue is empty.
      */
-    std::shared_ptr<job_t> alloced_pop () {
+    std::shared_ptr<job_t> alloced_pop ()
+    {
         std::shared_ptr<job_t> job;
         flux_jobid_t id;
         if (m_alloced.empty ())
@@ -693,7 +705,8 @@ public:
      *  \return          a shared pointer pointing to a job_t object
      *                   on success; nullptr when the queue is empty.
      */
-    std::shared_ptr<job_t> rejected_pop () {
+    std::shared_ptr<job_t> rejected_pop ()
+    {
         std::shared_ptr<job_t> job;
         flux_jobid_t id;
         if (m_rejected.empty ())
@@ -703,7 +716,7 @@ public:
             return nullptr;
         job = m_jobs[id];
         m_rejected.erase (job->t_stamps.rejected_ts);
-        return job;        
+        return job;
     }
 
     /*! Pop the first job from the internal canceled job queue.
@@ -711,7 +724,8 @@ public:
      *  \return          a shared pointer pointing to a job_t object
      *                   on success; nullptr when the queue is empty.
      */
-    std::shared_ptr<job_t> canceled_pop () {
+    std::shared_ptr<job_t> canceled_pop ()
+    {
         std::shared_ptr<job_t> job;
         flux_jobid_t id;
         if (m_canceled.empty ())
@@ -728,8 +742,7 @@ public:
     /* This doesn't appear to be used anywhere */
     std::shared_ptr<job_t> reserved_pop ();
 
-    job_map_iter to_running (job_map_iter pending_iter,
-                    bool use_alloced_queue)
+    job_map_iter to_running (job_map_iter pending_iter, bool use_alloced_queue)
     {
         flux_jobid_t id = pending_iter->second;
         if (m_jobs.find (id) == m_jobs.end ()) {
@@ -740,8 +753,8 @@ public:
         std::shared_ptr<job_t> job = m_jobs[id];
         job->state = job_state_kind_t::RUNNING;
         job->t_stamps.running_ts = m_rq_cnt++;
-        auto res = m_running.insert (std::pair<uint64_t, flux_jobid_t>(
-                                         job->t_stamps.running_ts, job->id));
+        auto res = m_running.insert (
+            std::pair<uint64_t, flux_jobid_t> (job->t_stamps.running_ts, job->id));
         if (!res.second) {
             errno = ENOMEM;
             return pending_iter;
@@ -749,8 +762,8 @@ public:
 
         if (use_alloced_queue) {
             job->state = job_state_kind_t::ALLOC_RUNNING;
-            auto res = m_alloced.insert (std::pair<uint64_t, flux_jobid_t>(
-                                             job->t_stamps.running_ts, job->id));
+            auto res = m_alloced.insert (
+                std::pair<uint64_t, flux_jobid_t> (job->t_stamps.running_ts, job->id));
             if (!res.second) {
                 errno = ENOMEM;
                 return pending_iter;
@@ -762,7 +775,6 @@ public:
         return m_pending.erase (pending_iter);
     }
 
-
     /*! Reprioritize a job with a new priority.
      *
      *  \param id        jobid of flux_jobid_t type.
@@ -772,7 +784,8 @@ public:
      *                       EEXIST: id already exists
      *                       EINVAL: job not pending
      */
-    int pending_reprioritize (flux_jobid_t id, unsigned int priority) {
+    int pending_reprioritize (flux_jobid_t id, unsigned int priority)
+    {
         std::shared_ptr<job_t> job = nullptr;
 
         if (m_jobs.find (id) == m_jobs.end ()) {
@@ -786,9 +799,9 @@ public:
         }
 
         auto res = m_pending_reprio_provisional.insert (
-                       std::pair<uint64_t,
-                                 std::pair<flux_jobid_t, unsigned int>> (
-                           m_reprio_cnt, std::make_pair (job->id, priority)));
+            std::pair<uint64_t, std::pair<flux_jobid_t, unsigned int>> (m_reprio_cnt,
+                                                                        std::make_pair (job->id,
+                                                                                        priority)));
         m_reprio_cnt++;
         if (!res.second) {
             errno = EEXIST;
@@ -800,10 +813,7 @@ public:
         return 0;
     }
 
-
-protected:
-
-
+   protected:
     /*! Reconstruct the queue.
      *
      * \param job        shared pointer to a running job whose resource
@@ -816,11 +826,11 @@ protected:
      *                       EPROTO: job->schedule.R doesn't comply.
      *                       ENOTSUP: job->schedule.R has unsupported feature.
      */
-    int reconstruct_queue (std::shared_ptr<job_t> job) {
+    int reconstruct_queue (std::shared_ptr<job_t> job)
+    {
         int rc = -1;
         std::pair<std::map<uint64_t, flux_jobid_t>::iterator, bool> ret;
-        std::pair<std::map<flux_jobid_t,
-                           std::shared_ptr<job_t>>::iterator, bool> ret2;
+        std::pair<std::map<flux_jobid_t, std::shared_ptr<job_t>>::iterator, bool> ret2;
 
         if (job == nullptr || m_jobs.find (job->id) != m_jobs.end ()) {
             errno = EINVAL;
@@ -828,15 +838,14 @@ protected:
         }
         job->t_stamps.running_ts = m_rq_cnt++;
 
-        ret = m_running.insert (std::pair<uint64_t, flux_jobid_t>(
-                                    job->t_stamps.running_ts, job->id));
+        ret = m_running.insert (
+            std::pair<uint64_t, flux_jobid_t> (job->t_stamps.running_ts, job->id));
         if (ret.second == false) {
             rc = -1;
             errno = ENOMEM;
             goto out;
         }
-        ret2 = m_jobs.insert (std::pair<flux_jobid_t, std::shared_ptr<job_t>> (
-                                 job->id, job));
+        ret2 = m_jobs.insert (std::pair<flux_jobid_t, std::shared_ptr<job_t>> (job->id, job));
         if (ret2.second == false) {
             m_running.erase (ret.first);
             rc = -1;
@@ -864,8 +873,7 @@ protected:
                     return -1;
                 job->state = job_state_kind_t::CANCELED;
                 auto res = m_canceled.insert (
-                               std::pair<uint64_t, flux_jobid_t> (
-                                   job->t_stamps.canceled_ts, job->id));
+                    std::pair<uint64_t, flux_jobid_t> (job->t_stamps.canceled_ts, job->id));
                 if (!res.second) {
                     errno = EEXIST;
                     return -1;
@@ -905,9 +913,7 @@ protected:
         return 0;
     }
 
-
-    int insert_pending_job (std::shared_ptr<job_t> &job,
-                                                  bool into_provisional)
+    int insert_pending_job (std::shared_ptr<job_t> &job, bool into_provisional)
     {
         auto &pending_map = into_provisional ? m_pending_provisional : m_pending;
         auto res = pending_map.emplace (job->get_key (), job->id);
@@ -939,8 +945,8 @@ protected:
         return 0;
     }
 
-    std::map<uint64_t, flux_jobid_t>::iterator 
-        to_complete (std::map<uint64_t, flux_jobid_t>::iterator running_iter)
+    std::map<uint64_t, flux_jobid_t>::iterator to_complete (
+        std::map<uint64_t, flux_jobid_t>::iterator running_iter)
     {
         flux_jobid_t id = running_iter->second;
         if (m_jobs.find (id) == m_jobs.end ()) {
@@ -951,8 +957,8 @@ protected:
         std::shared_ptr<job_t> job = m_jobs[id];
         job->state = job_state_kind_t::COMPLETE;
         job->t_stamps.complete_ts = m_cq_cnt++;
-        auto res = m_complete.insert (std::pair<uint64_t, flux_jobid_t>(
-                                          job->t_stamps.complete_ts, job->id));
+        auto res = m_complete.insert (
+            std::pair<uint64_t, flux_jobid_t> (job->t_stamps.complete_ts, job->id));
         if (!res.second) {
             errno = ENOMEM;
             return running_iter;
@@ -961,8 +967,7 @@ protected:
         return m_running.erase (running_iter);
     }
 
-    job_map_iter to_rejected (job_map_iter pending_iter,
-                     const std::string &note)
+    job_map_iter to_rejected (job_map_iter pending_iter, const std::string &note)
     {
         flux_jobid_t id = pending_iter->second;
         if (m_jobs.find (id) == m_jobs.end ()) {
@@ -974,8 +979,8 @@ protected:
         job->state = job_state_kind_t::REJECTED;
         job->note = note;
         job->t_stamps.rejected_ts = m_dq_cnt++;
-        auto res = m_rejected.insert (std::pair<uint64_t, flux_jobid_t>(
-                                          job->t_stamps.rejected_ts, job->id));
+        auto res = m_rejected.insert (
+            std::pair<uint64_t, flux_jobid_t> (job->t_stamps.rejected_ts, job->id));
         if (!res.second) {
             errno = ENOMEM;
             return pending_iter;
@@ -1004,8 +1009,7 @@ protected:
     std::map<pending_key, flux_jobid_t> m_pending_provisional;
     std::map<uint64_t, flux_jobid_t> m_pending_cancel_provisional;
     bool m_pending_reconsider = false;
-    std::map<uint64_t, std::pair<flux_jobid_t,
-	                         unsigned int>> m_pending_reprio_provisional;
+    std::map<uint64_t, std::pair<flux_jobid_t, unsigned int>> m_pending_reprio_provisional;
     std::map<uint64_t, flux_jobid_t> m_running;
     std::map<uint64_t, flux_jobid_t> m_alloced;
     std::map<uint64_t, flux_jobid_t> m_complete;
@@ -1015,10 +1019,8 @@ protected:
     std::unordered_map<std::string, std::string> m_qparams;
     std::unordered_map<std::string, std::string> m_pparams;
 
-private:
-
-    int set_params (const std::string &params, std::unordered_map<std::string,
-                                                          std::string> &p_map)
+   private:
+    int set_params (const std::string &params, std::unordered_map<std::string, std::string> &p_map)
     {
         int rc = -1;
         size_t pos = 0;
@@ -1046,8 +1048,7 @@ private:
         return rc;
     }
 
-    int set_param (std::string &p_pair, std::unordered_map<std::string,
-                                                           std::string> &p_map)
+    int set_param (std::string &p_pair, std::unordered_map<std::string, std::string> &p_map)
     {
         int rc = -1;
         size_t pos = 0;
@@ -1068,17 +1069,19 @@ private:
         v.erase (std::remove_if (v.begin (), v.end (), ::isspace), v.end ());
         if (p_map.find (k) != p_map.end ())
             p_map.erase (k);
-        p_map.insert (std::pair<std::string, std::string>(k, v));
+        p_map.insert (std::pair<std::string, std::string> (k, v));
         rc = 0;
     done:
         return rc;
     }
 
-    bool is_number (const std::string &num_str) {
+    bool is_number (const std::string &num_str)
+    {
         if (num_str.empty ())
             return false;
-        auto i = std::find_if (num_str.begin (), num_str.end (),
-                               [] (unsigned char c) { return !std::isdigit (c); });
+        auto i = std::find_if (num_str.begin (), num_str.end (), [] (unsigned char c) {
+            return !std::isdigit (c);
+        });
         return i == num_str.end ();
     }
 
@@ -1086,10 +1089,10 @@ private:
     bool m_iter_valid = false;
 };
 
-} // namespace Flux::queue_manager
-} // namespace Flux
+}  // namespace queue_manager
+}  // namespace Flux
 
-#endif // QUEUE_POLICY_BASE_HPP
+#endif  // QUEUE_POLICY_BASE_HPP
 
 /*
  * vi:tabstop=4 shiftwidth=4 expandtab

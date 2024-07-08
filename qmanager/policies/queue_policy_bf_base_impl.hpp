@@ -19,7 +19,6 @@ namespace Flux {
 namespace queue_manager {
 namespace detail {
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // Private Methods of Queue Policy Backfill Base
 ////////////////////////////////////////////////////////////////////////////////
@@ -50,7 +49,8 @@ int queue_policy_bf_base_t<reapi_type>::cancel_reserved_jobs (void *h)
 }
 
 template<class reapi_type>
-int queue_policy_bf_base_t<reapi_type>::next_match_iter () {
+int queue_policy_bf_base_t<reapi_type>::next_match_iter ()
+{
     bool reached_queue_depth = m_scheduled_cnt >= m_queue_depth;
     bool reached_end_of_queue = m_in_progress_iter == m_pending.end ();
     if (reached_end_of_queue || reached_queue_depth) {
@@ -66,20 +66,21 @@ int queue_policy_bf_base_t<reapi_type>::next_match_iter () {
 
     auto &job = m_jobs[m_in_progress_iter->second];
     m_try_reserve = m_reservation_cnt < m_reservation_depth;
-    json_t *jobarray_ptr = json_pack ("[{s:I s:s}]", "jobid", job->id, "jobspec", job->jobspec.c_str ());
-    if ( !jobarray_ptr) {
+    json_t *jobarray_ptr =
+        json_pack ("[{s:I s:s}]", "jobid", job->id, "jobspec", job->jobspec.c_str ());
+    if (!jobarray_ptr) {
         errno = ENOMEM;
         return -1;
     }
-    auto _jdecref = [](json_t *p) { json_decref (p); };
+    auto _jdecref = [] (json_t *p) { json_decref (p); };
     std::unique_ptr<json_t, decltype (_jdecref)> jobarray (jobarray_ptr, _jdecref);
     char *jobs_ptr = json_dumps (jobarray.get (), JSON_INDENT (0));
-    if ( !jobs_ptr) {
+    if (!jobs_ptr) {
         errno = ENOMEM;
         return -1;
     }
-    auto _free = [](char *p) { free (p); };
-    std::unique_ptr<char, decltype (_free)>  jobs_str (jobs_ptr, _free);
+    auto _free = [] (char *p) { free (p); };
+    std::unique_ptr<char, decltype (_free)> jobs_str (jobs_ptr, _free);
     return reapi_type::match_allocate_multi (m_handle, m_try_reserve, jobs_str.get (), this);
 }
 
@@ -116,7 +117,6 @@ int queue_policy_bf_base_t<reapi_type>::allocate_orelse_reserve_jobs (void *h)
     return 0;
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // Public API of Queue Policy Backfill Base
 ////////////////////////////////////////////////////////////////////////////////
@@ -133,9 +133,11 @@ int queue_policy_bf_base_t<reapi_type>::apply_params ()
 }
 
 template<class reapi_type>
-int queue_policy_bf_base_t<reapi_type>::handle_match_success (
-                                         flux_jobid_t jobid, const char *status,
-                                         const char *R, int64_t at, double ov)
+int queue_policy_bf_base_t<reapi_type>::handle_match_success (flux_jobid_t jobid,
+                                                              const char *status,
+                                                              const char *R,
+                                                              int64_t at,
+                                                              double ov)
 {
     if (!is_sched_loop_active ()) {
         errno = EINVAL;
@@ -153,7 +155,7 @@ int queue_policy_bf_base_t<reapi_type>::handle_match_success (
         return -1;
     }
     auto &sched = job->schedule;
-    sched.reserved = std::string ("RESERVED") == status?  true : false;
+    sched.reserved = std::string ("RESERVED") == status ? true : false;
     sched.R = R;
     sched.old_at = sched.at;
     sched.at = at;
@@ -191,8 +193,8 @@ int queue_policy_bf_base_t<reapi_type>::handle_match_failure (flux_jobid_t jobid
     } else if (errno != EBUSY) {
         // The request must be rejected. The job is enqueued into
         // rejected job queue to the upper layer to react on this.
-        m_in_progress_iter = to_rejected (m_in_progress_iter,
-                (errno == ENODEV) ? "unsatisfiable" : "match error");
+        m_in_progress_iter =
+            to_rejected (m_in_progress_iter, (errno == ENODEV) ? "unsatisfiable" : "match error");
     } else {
         // errno is EBUSY and match_allocate returned -1
 
