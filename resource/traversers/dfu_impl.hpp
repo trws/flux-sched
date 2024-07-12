@@ -12,8 +12,6 @@
 #define DFU_TRAVERSE_IMPL_HPP
 
 #include <iostream>
-#include <sstream>
-#include <cstdlib>
 #include <cstdint>
 #include <memory>
 #include "resource/libjobspec/jobspec.hpp"
@@ -27,7 +25,8 @@
 #include "resource/writers/match_writers.hpp"
 #include "resource/store/resource_graph_store.hpp"
 #include "resource/readers/resource_reader_base.hpp"
-#include "resource/planner/c/planner.h"
+
+#include <schema/color.hpp>
 
 namespace Flux {
 namespace resource_model {

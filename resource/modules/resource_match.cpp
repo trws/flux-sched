@@ -24,6 +24,7 @@ extern "C" {
 #include <map>
 #include <cinttypes>
 #include <chrono>
+#include <fstream>
 
 #include "resource/schema/resource_graph.hpp"
 #include "resource/readers/resource_reader_factory.hpp"

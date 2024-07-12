@@ -8,6 +8,7 @@
  * SPDX-License-Identifier: LGPL-3.0
 \*****************************************************************************/
 
+#include <sys/time.h>
 extern "C" {
 #if HAVE_CONFIG_H
 #include "config.h"
@@ -26,6 +27,8 @@ extern "C" {
 #include <editline/readline.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/graph/graphml.hpp>
+#include <boost/graph/graphviz.hpp>
 #include "resource/utilities/command.hpp"
 #include "resource/store/resource_graph_store.hpp"
 #include "resource/policies/dfu_match_policy_factory.hpp"

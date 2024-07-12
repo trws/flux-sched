@@ -19,6 +19,7 @@ extern "C" {
 }
 
 #include <stdexcept>
+#include <sys/time.h>
 #include <jansson.h>
 #include <boost/algorithm/string.hpp>
 #include "resource/reapi/bindings/c++/reapi_cli.hpp"

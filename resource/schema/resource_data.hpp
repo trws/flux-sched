@@ -11,15 +11,10 @@
 #ifndef RESOURCE_DATA_HPP
 #define RESOURCE_DATA_HPP
 
-#include <uuid/uuid.h>
 #include <string>
-#include <cstring>
 #include <map>
 #include <unordered_map>
-#include <set>
-#include "resource/schema/color.hpp"
 #include "resource/schema/resource_base.hpp"
-#include "resource/schema/data_std.hpp"
 #include "resource/schema/sched_data.hpp"
 #include "resource/schema/infra_data.hpp"
 #include "resource/planner/c/planner.h"

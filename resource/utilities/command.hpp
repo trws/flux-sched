@@ -20,6 +20,7 @@
 #include <cerrno>
 #include <vector>
 #include <map>
+#include <fstream>
 
 namespace Flux {
 namespace resource_model {
