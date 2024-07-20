@@ -82,9 +82,14 @@ view_and_id get_both (const interner_t group_id, const std::string_view s, char 
 
     {  // shared lock scope
         auto sl = std::shared_lock (*storage.mtx);
+#if __GNUC__ < 11
+        // this awful workaround is required by focal support
+        auto it = storage.ids_by_string.find (std::string (s));
+#else
         auto it = storage.ids_by_string.find (s);
+#endif
         if (it != storage.ids_by_string.end ())
-            return {&it->first, it->second};
+            return view_and_id{&it->first, it->second};
         if (!check_valid (storage.strings_by_id.size () + 1, bytes_supported))
             throw std::system_error (ENOMEM,
                                      std::generic_category (),

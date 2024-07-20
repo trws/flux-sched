@@ -208,6 +208,8 @@ matrix.add_build(
     name="noble - golang-test",
     image="noble-golang",
     env=dict(
+        CC="gcc-10",
+        CXX="g++-10",
         WITH_GO="yes",
     ),
     args="",

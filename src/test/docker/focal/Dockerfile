@@ -14,6 +14,8 @@ RUN sudo apt-get -qq install -y --no-install-recommends \
 	libyaml-cpp-dev \
 	libedit-dev \
   ninja-build \
+  gcc-10 \
+  g++-10 \
 	curl
 
 RUN curl -s -L https://github.com/Kitware/CMake/releases/download/v3.18.5/cmake-3.18.5-linux-$(uname -m).sh > cmake.sh ;\

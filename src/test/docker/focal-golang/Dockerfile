@@ -13,6 +13,8 @@ RUN sudo apt-get -qq install -y --no-install-recommends \
     python-yaml \
     libyaml-cpp-dev \
     ninja-build \
+    gcc-10 \
+    g++-10 \
     curl \
     libedit-dev
 

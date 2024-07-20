@@ -36,9 +36,9 @@ const std::string *get_by_id (interner_t group_id, uintptr_t string_id);
 
 /// A convenience wrapper of an interned string
 template<uint64_t Tag, class Id>
-    requires (sizeof (Id) <= sizeof (uintptr_t))
 class interned_string {
     Id _id = 0;
+    static_assert ((sizeof (Id) <= sizeof (uintptr_t)), "Id must be at most the size of a pointer");
 
     // Not at all safe, verified by a pre-condition check in get_by_id
     explicit interned_string (Id id) : _id (id)
