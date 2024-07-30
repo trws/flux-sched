@@ -126,7 +126,7 @@ Resource::Resource (const YAML::Node &resnode)
     if (!resnode["type"].IsScalar ()) {
         throw parse_error (resnode["type"], "Value of \"type\" must be a scalar");
     }
-    type = resource_model::resource_type_t{resnode["type"].as<std::string> ()};
+    type = resource_model::resource_type_t::make_untrusted (resnode["type"].as<std::string> ());
     field_count++;
 
     if (!resnode["count"]) {

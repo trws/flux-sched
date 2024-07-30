@@ -50,3 +50,25 @@ TEST_CASE ("interner: smaller ID limits properly", "[interner]")
     CHECK_THROWS (tt::make (otm));
     REQUIRE_NOTHROW (interner_get_str (tt::interner, {otm.data (), otm.size ()}).id == UINTPTR_MAX);
 }
+
+TEST_CASE ("interner: maybe_intern: can create and compare", "[interner]")
+{
+    using tt = intern::interned_string<11, uint8_t>;
+    using mis = typename tt::maybe_interned_string;
+    auto s1 = tt("s1"sv);
+    auto s2 = tt("s2"sv);
+    mis ms1 = tt::make_untrusted("s1"sv);
+    mis ms2 = tt::make_untrusted("s2"sv);
+    mis ms3 = tt::make_untrusted("s3"sv);
+    REQUIRE(s1 == ms1);
+    REQUIRE(s1 < ms2);
+    REQUIRE(ms2 > s1);
+    REQUIRE("s1"sv < ms2);
+    REQUIRE(ms2 > "s1"sv);
+    REQUIRE(s2 == ms2);
+
+    REQUIRE(ms3 == "s3"sv);
+    REQUIRE(ms1.is_interned());
+    REQUIRE(ms2.is_interned());
+    REQUIRE_FALSE(ms3.is_interned());
+}

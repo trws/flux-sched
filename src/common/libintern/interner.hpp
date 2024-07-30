@@ -29,7 +29,10 @@ struct view_and_id {
     uint64_t id;
 };
 
-view_and_id get_both (interner_t group_id, std::string_view s, char bytes_supported);
+view_and_id get_both (const interner_t group_id,
+                      const std::string_view s,
+                      char bytes_supported,
+                      bool create = true);
 
 const std::string *get_by_id (interner_t group_id, uintptr_t string_id);
 };  // namespace detail
@@ -83,6 +86,97 @@ class interned_string {
         // will throw if this does not exist
         detail::get_by_id (Tag, id);
         return interned_string (id);
+    }
+
+    /// Helper class for untrusted strings, if the string is in the intern pool, it's an
+    /// interned_string, if not then it's stored as a std::string, either way it's comparable with
+    /// other interned_strings of this type
+    class maybe_interned_string {
+        std::string _s = "";
+        Id _val = 0;
+        bool interned = false;
+
+    public:
+        maybe_interned_string () = default;
+        explicit maybe_interned_string (std::string_view sv)
+        {
+            auto [sptr, id] = detail::get_both (interner, sv, sizeof (Id), false);
+            if (!sptr) {
+                _s = sv;
+            } else {
+                _val = id;
+                interned = true;
+            }
+        }
+        maybe_interned_string (const maybe_interned_string &o) = default;
+
+        maybe_interned_string (maybe_interned_string &&) = default;
+
+        maybe_interned_string &operator= (const maybe_interned_string &) = default;
+
+        maybe_interned_string &operator= (maybe_interned_string &&) = default;
+
+        /// interned strings are ordered by insertion not value
+        auto operator<=> (const maybe_interned_string &) const = default;
+
+        /// identity comparison
+        bool operator== (const maybe_interned_string &) const = default;
+
+        auto operator<=> (const interned_string &s) const
+        {
+            if (interned) {
+                return _val <=> s._id;
+            }
+            return _s <=> s.get ();
+        }
+
+        bool operator== (const interned_string &s) const
+        {
+            if (interned) {
+                return _val == s._id;
+            }
+            return _s == s.get ();
+        }
+
+        auto operator<=> (const std::string_view sv) const
+        {
+            if (interned) {
+                return *detail::get_by_id (interner, _val) <=> sv;
+            }
+            return _s <=> sv;
+        }
+
+        bool operator== (const std::string_view sv) const
+        {
+            if (interned) {
+                return *detail::get_by_id (interner, _val) == sv;
+            }
+            return _s == sv;
+        }
+
+        const std::string &get () const
+        {
+            if (interned)
+                 return *detail::get_by_id (interner, _val);
+            return _s;
+        }
+
+        bool is_interned() const
+        {
+            return interned;
+        }
+
+        friend std::ostream &operator<< (std::ostream &os, const maybe_interned_string &obj)
+        {
+            if (obj.interned)
+                return os << obj._s;
+            return os << obj.get ();
+        }
+    };
+
+    static maybe_interned_string make_untrusted(std::string_view sv)
+    {
+        return maybe_interned_string(sv);
     }
 
     struct istring_end {

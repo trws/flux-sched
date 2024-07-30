@@ -76,7 +76,10 @@ static bool check_valid (uintptr_t val, char bytes_supported)
     return val < UINT64_MAX;
 }
 
-view_and_id get_both (const interner_t group_id, const std::string_view s, char bytes_supported)
+view_and_id get_both (const interner_t group_id,
+                      const std::string_view s,
+                      char bytes_supported,
+                      bool create /* = true */)
 {
     interner_storage &storage = get_group (group_id.id);
 
@@ -91,6 +94,8 @@ view_and_id get_both (const interner_t group_id, const std::string_view s, char 
                                      "Too many strings for configured size");
     }  // release shared lock
 
+    if (!create)
+        return {NULL, 0};
     // writer lock scope
     auto ul = std::unique_lock (*storage.mtx);
     const auto &[it, added] = storage.ids_by_string.emplace (s, UINTPTR_MAX);
